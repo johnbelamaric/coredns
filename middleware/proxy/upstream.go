@@ -213,18 +213,30 @@ func parseBlock(c *caddyfile.Dispenser, u *staticUpstream) error {
 			u.encoding = encodingNone
 		case "grpc":
 			u.encoding = encodingGRPC
-			// no TLS, use plaintext
 			if len(encArgs) == 2 && encArgs[1] == "insecure" {
+				// no TLS, use plaintext
 				return nil
 			}
-			if len(encArgs) != 4 {
+			var err error
+			switch len(encArgs) {
+			case 1:
+				// No client cert, use system CA
+				u.tls, err = mwtls.NewTLSClientConfig("")
+			case 2:
+				// No client cert, use specified CA
+				u.tls, err = mwtls.NewTLSClientConfig(encArgs[1])
+			case 3:
+				// Client cert, use system CA
+				u.tls, err = mwtls.NewTLSConfig(encArgs[1], encArgs[2], "")
+			case 4:
+				// Client cert, use specified CA
+				u.tls, err = mwtls.NewTLSConfig(encArgs[1], encArgs[2], encArgs[3])
+			default:
 				return c.ArgErr()
 			}
-			tls, err := mwtls.NewTLSConfig(encArgs[1], encArgs[2], encArgs[3])
 			if err != nil {
 				return c.Errf("could not create TLS config: %s", err)
 			}
-			u.tls = tls
 		default:
 			return c.Errf("unknown encoding '%s'", encArgs[0])
 		}
