@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/tls"
 	"io"
 	"io/ioutil"
 	"net"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/miekg/coredns/middleware"
 	"github.com/miekg/coredns/middleware/pkg/dnsutil"
+	mwtls "github.com/miekg/coredns/middleware/pkg/tls"
 
 	"github.com/mholt/caddy/caddyfile"
 	"github.com/miekg/dns"
@@ -19,6 +21,14 @@ import (
 
 var (
 	supportedPolicies = make(map[string]func() Policy)
+)
+
+type upstreamEncoding uint
+
+const (
+	encodingNone upstreamEncoding = iota
+	encodingGRPC
+	encodingGRPCTLS
 )
 
 type staticUpstream struct {
@@ -37,6 +47,8 @@ type staticUpstream struct {
 	WithoutPathPrefix string
 	IgnoredSubDomains []string
 	options           Options
+	encoding	  upstreamEncoding
+	tls		  *tls.Config
 }
 
 // Options ...
@@ -56,6 +68,8 @@ func NewStaticUpstreams(c *caddyfile.Dispenser) ([]Upstream, error) {
 			Spray:       nil,
 			FailTimeout: 10 * time.Second,
 			MaxFails:    1,
+			encoding:    encodingNone,
+			tls:         nil,
 		}
 
 		if !c.Args(&upstream.from) {
@@ -101,6 +115,8 @@ func NewStaticUpstreams(c *caddyfile.Dispenser) ([]Upstream, error) {
 					}
 				}(upstream),
 				WithoutPathPrefix: upstream.WithoutPathPrefix,
+				encoding: upstream.encoding,
+				tls: upstream.tls,
 			}
 			upstream.Hosts[i] = uh
 		}
@@ -188,7 +204,29 @@ func parseBlock(c *caddyfile.Dispenser, u *staticUpstream) error {
 		u.IgnoredSubDomains = ignoredDomains
 	case "spray":
 		u.Spray = &Spray{}
-
+	case "encoding":
+		encArgs := c.RemainingArgs()
+		if len(encArgs) == 0 {
+			return c.ArgErr()
+		}
+		switch encArgs[0] {
+		case "none":
+			u.encoding = encodingNone
+		case "grpc":
+			u.encoding = encodingGRPC
+		case "grpc+tls":
+			u.encoding = encodingGRPCTLS
+			if len(encArgs) != 4 {
+				return c.ArgErr()
+			}
+			tls, err := mwtls.NewTLSConfig(encArgs[1], encArgs[2], encArgs[3])
+			if err != nil {
+				return c.Errf("could not create TLS config: %s", err)
+			}
+			u.tls = tls
+		default:
+			return c.Errf("unknown encoding '%s'", encArgs[0])
+		}
 	default:
 		return c.Errf("unknown property '%s'", c.Val())
 	}
