@@ -28,7 +28,6 @@ type upstreamEncoding uint
 const (
 	encodingNone upstreamEncoding = iota
 	encodingGRPC
-	encodingGRPCTLS
 )
 
 type staticUpstream struct {
@@ -214,8 +213,10 @@ func parseBlock(c *caddyfile.Dispenser, u *staticUpstream) error {
 			u.encoding = encodingNone
 		case "grpc":
 			u.encoding = encodingGRPC
-		case "grpc+tls":
-			u.encoding = encodingGRPCTLS
+			// no TLS, use plaintext
+			if len(encArgs) == 2 && encArgs[1] == "insecure" {
+				return nil
+			}
 			if len(encArgs) != 4 {
 				return c.ArgErr()
 			}

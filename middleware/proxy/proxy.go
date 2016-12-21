@@ -81,8 +81,6 @@ func (uh *UpstreamHost) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *d
 			reply, backendErr = p.Client.ServeDNS(w, r, uh)
 		case encodingGRPC:
 			reply, backendErr = uh.serveGRPC(ctx, w, r)
-		case encodingGRPCTLS:
-			reply, backendErr = uh.serveGRPC(ctx, w, r)
 		default:
 			reply, backendErr =  nil, errInvalidEncoding
 	}
@@ -91,8 +89,8 @@ func (uh *UpstreamHost) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *d
 	return reply, backendErr
 }
 
-func (uh *UpstreamHost) serveGRPC(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (*dns.Msg, error) {
-	if uh.grpc == nil {
+func (uh *UpstreamHost) dialConns() error {
+	if uh.encoding == encodingGRPC {
 		var conn *grpc.ClientConn
 		var err error
 		if uh.tls != nil {
@@ -101,9 +99,19 @@ func (uh *UpstreamHost) serveGRPC(ctx context.Context, w dns.ResponseWriter, r *
 			conn, err = grpc.Dial(uh.Name, grpc.WithInsecure())
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 		uh.grpc = pb.NewDnsServiceClient(conn)
+	}
+	return nil
+}
+
+func (uh *UpstreamHost) serveGRPC(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (*dns.Msg, error) {
+	if uh.grpc == nil {
+		err := uh.dialConns()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	msg, err := r.Pack()
