@@ -69,7 +69,7 @@ func (uh *UpstreamHost) Down() bool {
 	return uh.CheckDown(uh)
 }
 
-func (uh *UpstreamHost) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg, p Proxy) (*dns.Msg, error) {
+func (uh *UpstreamHost) serveDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg, p Proxy) (*dns.Msg, error) {
 
 	var reply *dns.Msg
 	var backendErr error
@@ -151,7 +151,7 @@ func (p Proxy) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (
 				return dns.RcodeServerFailure, errUnreachable
 			}
 
-			reply, backendErr := host.ServeDNS(ctx, w, r, p)
+			reply, backendErr := host.serveDNS(ctx, w, r, p)
 
 			if backendErr == nil {
 				w.WriteMsg(reply)

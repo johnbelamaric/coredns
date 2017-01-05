@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 )
 
-// Returns a TLS config that includes a certificate
+// NewTLSConfig returns a TLS config that includes a certificate
 // Use for server TLS config or when using a client certificate
 // If caPath is empty, system CAs will be used
 func NewTLSConfig(certPath, keyPath, caPath string) (*tls.Config, error) {
@@ -24,7 +24,7 @@ func NewTLSConfig(certPath, keyPath, caPath string) (*tls.Config, error) {
 	return &tls.Config{Certificates: []tls.Certificate{cert}, RootCAs: roots}, nil
 }
 
-// Returns a TLS config for a client connection
+// NewTLSClientConfig returns a TLS config for a client connection
 // If caPath is empty, system CAs will be used
 func NewTLSClientConfig(caPath string) (*tls.Config, error) {
 	roots, err := loadRoots(caPath)
