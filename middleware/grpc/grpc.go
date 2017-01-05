@@ -3,11 +3,13 @@ package grpc
 
 import (
 	"crypto/tls"
+	"fmt"
 	"log"
 	"net"
 
 	context "golang.org/x/net/context"
 	grpclib "google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
 
 	"github.com/miekg/dns"
 	"github.com/miekg/coredns/core/dnsserver"
@@ -55,9 +57,18 @@ func (g *grpc) Query(ctx context.Context, in *pb.DnsPacket) (*pb.DnsPacket, erro
 		return nil, err
 	}
 
-	//TODO(jbelamaric): this is junk
-	a := &net.IPAddr{IP:net.ParseIP("127.0.0.1")}
-	w := &response{localAddr: a, remoteAddr: a}
+	p, ok := peer.FromContext(ctx);
+	if !ok {
+		return nil, fmt.Errorf("Could not find peer in gRPC context.")
+	}
+	a, ok := p.Addr.(*net.TCPAddr);
+	if !ok {
+		return nil, fmt.Errorf("gRPC Peer address is not a TCPAddr: %v", p.Addr)
+	}
+	l := &net.IPAddr{IP:net.ParseIP(g.addr)}
+	r := &net.IPAddr{IP:a.IP}
+
+	w := &response{localAddr: l, remoteAddr: r}
 	g.config.Server.ServeDNS(w, msg)
 
 	packed, err := w.Msg.Pack()
