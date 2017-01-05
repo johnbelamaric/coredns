@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/tls"
 	"io"
 	"io/ioutil"
 	"net"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/miekg/coredns/middleware"
 	"github.com/miekg/coredns/middleware/pkg/dnsutil"
+	mwtls "github.com/miekg/coredns/middleware/pkg/tls"
 
 	"github.com/mholt/caddy/caddyfile"
 	"github.com/miekg/dns"
@@ -19,6 +21,13 @@ import (
 
 var (
 	supportedPolicies = make(map[string]func() Policy)
+)
+
+type upstreamProtocol uint
+
+const (
+	protocolUDP upstreamProtocol = iota
+	protocolGRPC
 )
 
 type staticUpstream struct {
@@ -37,6 +46,8 @@ type staticUpstream struct {
 	WithoutPathPrefix string
 	IgnoredSubDomains []string
 	options           Options
+	protocol	  upstreamProtocol
+	tls		  *tls.Config
 }
 
 // Options ...
@@ -56,6 +67,8 @@ func NewStaticUpstreams(c *caddyfile.Dispenser) ([]Upstream, error) {
 			Spray:       nil,
 			FailTimeout: 10 * time.Second,
 			MaxFails:    1,
+			protocol:    protocolUDP,
+			tls:         nil,
 		}
 
 		if !c.Args(&upstream.from) {
@@ -101,6 +114,8 @@ func NewStaticUpstreams(c *caddyfile.Dispenser) ([]Upstream, error) {
 					}
 				}(upstream),
 				WithoutPathPrefix: upstream.WithoutPathPrefix,
+				protocol: upstream.protocol,
+				tls: upstream.tls,
 			}
 			upstream.Hosts[i] = uh
 		}
@@ -188,7 +203,43 @@ func parseBlock(c *caddyfile.Dispenser, u *staticUpstream) error {
 		u.IgnoredSubDomains = ignoredDomains
 	case "spray":
 		u.Spray = &Spray{}
-
+	case "protocol":
+		encArgs := c.RemainingArgs()
+		if len(encArgs) == 0 {
+			return c.ArgErr()
+		}
+		switch encArgs[0] {
+		case "udp":
+			u.protocol = protocolUDP
+		case "grpc":
+			u.protocol = protocolGRPC
+			if len(encArgs) == 2 && encArgs[1] == "insecure" {
+				// no TLS, use plaintext
+				return nil
+			}
+			var err error
+			switch len(encArgs) {
+			case 1:
+				// No client cert, use system CA
+				u.tls, err = mwtls.NewTLSClientConfig("")
+			case 2:
+				// No client cert, use specified CA
+				u.tls, err = mwtls.NewTLSClientConfig(encArgs[1])
+			case 3:
+				// Client cert, use system CA
+				u.tls, err = mwtls.NewTLSConfig(encArgs[1], encArgs[2], "")
+			case 4:
+				// Client cert, use specified CA
+				u.tls, err = mwtls.NewTLSConfig(encArgs[1], encArgs[2], encArgs[3])
+			default:
+				return c.ArgErr()
+			}
+			if err != nil {
+				return c.Errf("could not create TLS config: %s", err)
+			}
+		default:
+			return c.Errf("unknown protocol '%s'", encArgs[0])
+		}
 	default:
 		return c.Errf("unknown property '%s'", c.Val())
 	}
