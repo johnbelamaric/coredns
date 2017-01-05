@@ -23,11 +23,11 @@ var (
 	supportedPolicies = make(map[string]func() Policy)
 )
 
-type upstreamEncoding uint
+type upstreamProtocol uint
 
 const (
-	encodingNone upstreamEncoding = iota
-	encodingGRPC
+	protocolUDP upstreamProtocol = iota
+	protocolGRPC
 )
 
 type staticUpstream struct {
@@ -46,7 +46,7 @@ type staticUpstream struct {
 	WithoutPathPrefix string
 	IgnoredSubDomains []string
 	options           Options
-	encoding	  upstreamEncoding
+	protocol	  upstreamProtocol
 	tls		  *tls.Config
 }
 
@@ -67,7 +67,7 @@ func NewStaticUpstreams(c *caddyfile.Dispenser) ([]Upstream, error) {
 			Spray:       nil,
 			FailTimeout: 10 * time.Second,
 			MaxFails:    1,
-			encoding:    encodingNone,
+			protocol:    protocolUDP,
 			tls:         nil,
 		}
 
@@ -114,7 +114,7 @@ func NewStaticUpstreams(c *caddyfile.Dispenser) ([]Upstream, error) {
 					}
 				}(upstream),
 				WithoutPathPrefix: upstream.WithoutPathPrefix,
-				encoding: upstream.encoding,
+				protocol: upstream.protocol,
 				tls: upstream.tls,
 			}
 			upstream.Hosts[i] = uh
@@ -203,16 +203,16 @@ func parseBlock(c *caddyfile.Dispenser, u *staticUpstream) error {
 		u.IgnoredSubDomains = ignoredDomains
 	case "spray":
 		u.Spray = &Spray{}
-	case "encoding":
+	case "protocol":
 		encArgs := c.RemainingArgs()
 		if len(encArgs) == 0 {
 			return c.ArgErr()
 		}
 		switch encArgs[0] {
-		case "none":
-			u.encoding = encodingNone
+		case "udp":
+			u.protocol = protocolUDP
 		case "grpc":
-			u.encoding = encodingGRPC
+			u.protocol = protocolGRPC
 			if len(encArgs) == 2 && encArgs[1] == "insecure" {
 				// no TLS, use plaintext
 				return nil
@@ -238,7 +238,7 @@ func parseBlock(c *caddyfile.Dispenser, u *staticUpstream) error {
 				return c.Errf("could not create TLS config: %s", err)
 			}
 		default:
-			return c.Errf("unknown encoding '%s'", encArgs[0])
+			return c.Errf("unknown protocol '%s'", encArgs[0])
 		}
 	default:
 		return c.Errf("unknown property '%s'", c.Val())

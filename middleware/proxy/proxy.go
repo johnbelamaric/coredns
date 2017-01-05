@@ -18,7 +18,7 @@ import (
 )
 
 var errUnreachable = errors.New("unreachable backend")
-var errInvalidEncoding = errors.New("invalid encoding")
+var errInvalidProtocol = errors.New("invalid protocol")
 
 // Proxy represents a middleware instance that can proxy requests to another DNS server.
 type Proxy struct {
@@ -52,7 +52,7 @@ type UpstreamHost struct {
 	Unhealthy         bool
 	CheckDown         UpstreamHostDownFunc
 	WithoutPathPrefix string
-	encoding	  upstreamEncoding
+	protocol	  upstreamProtocol
 	tls		  *tls.Config
 	grpc		  pb.DnsServiceClient
 }
@@ -76,21 +76,21 @@ func (uh *UpstreamHost) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *d
 
 	atomic.AddInt64(&uh.Conns, 1)
 
-	switch uh.encoding {
-		case encodingNone:
+	switch uh.protocol {
+		case protocolUDP:
 			reply, backendErr = p.Client.ServeDNS(w, r, uh)
-		case encodingGRPC:
+		case protocolGRPC:
 			reply, backendErr = uh.serveGRPC(ctx, w, r)
 		default:
-			reply, backendErr =  nil, errInvalidEncoding
+			reply, backendErr =  nil, errInvalidProtocol
 	}
 	atomic.AddInt64(&uh.Conns, -1)
 
 	return reply, backendErr
 }
 
-func (uh *UpstreamHost) dialConns() error {
-	if uh.encoding == encodingGRPC {
+func (uh *UpstreamHost) dial() error {
+	if uh.protocol == protocolGRPC {
 		var conn *grpc.ClientConn
 		var err error
 		if uh.tls != nil {
@@ -108,7 +108,7 @@ func (uh *UpstreamHost) dialConns() error {
 
 func (uh *UpstreamHost) serveGRPC(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (*dns.Msg, error) {
 	if uh.grpc == nil {
-		err := uh.dialConns()
+		err := uh.dial()
 		if err != nil {
 			return nil, err
 		}

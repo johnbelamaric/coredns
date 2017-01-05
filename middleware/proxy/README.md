@@ -26,7 +26,7 @@ proxy FROM TO... {
     health_check PATH:PORT [DURATION]
     except IGNORED_NAMES...
     spray
-    encoding none|grpc|grpc insecure|grpc CACERT|grpc CERT KEY CACERT
+    protocol udp|grpc|grpc insecure|grpc CACERT|grpc CERT KEY CACERT
 }
 ~~~
 
@@ -58,37 +58,38 @@ If monitoring is enabled (via the *prometheus* directive) then the following met
 This has some overlap with `coredns_dns_request_count_total{zone, proto, family}`, but allows for
 specifics on upstream query resolving. See the *prometheus* documentation for more details.
 
-## Encodings
+## Upstream Protocols
 
-Currently supported are none (i.e., standard DNS over UDP) and gRPC (`grpc` in the config). For
-gRPC, the server would typically be another CoreDNS instance running the `grpc` middleware,
-although any server that implements the gRPC interface found in the source could be used.
+Currently supported are `udp` (i.e., standard DNS over UDP) and `grpc`. For
+`grpc`, the server would typically be another CoreDNS instance running the
+`grpc` middleware, although any server that implements the gRPC interface found
+in the source could be used.
 
 For `grpc`, you can further specify the TLS parameters as follows.
 
 Use TLS, and use the system CAs to validate the server certificate:
 ~~~
-encoding grpc
+protocol grpc
 ~~~
 
 Use TLS, but use a specific CA to validate the server certificate:
 ~~~
-encoding grpc /path/to/ca.pem
+protocol grpc /path/to/ca.pem
 ~~~
 
 Use TLS with a client certificate and the system CAs:
 ~~~
-encoding grpc /path/to/cert.pem /path/to/key.pem
+protocol grpc /path/to/cert.pem /path/to/key.pem
 ~~~
 
 Use TLS with a client certificate and a specific CA:
 ~~~
-encoding grpc /path/to/cert.pem /path/to/key.pem /path/to/ca.pem
+protocol grpc /path/to/cert.pem /path/to/key.pem /path/to/ca.pem
 ~~~
 
 Use plaintext (no TLS - this is primarily for debugging):
 ~~~
-encoding grpc insecure
+protocol grpc insecure
 ~~~
 
 ## Examples

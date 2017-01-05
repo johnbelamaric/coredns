@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mholt/caddy"
+	testlib "github.com/miekg/coredns/middleware/test"
 )
 
 func TestHealthCheck(t *testing.T) {
@@ -165,9 +166,71 @@ proxy . 8.8.8.8:53 {
 proxy . some_bogus_filename`,
 			true,
 		},
+		{
+			`
+proxy . 8.8.8.8:53 {
+    protocol udp
+}`,
+			false,
+		},
+		{
+			`
+proxy . 8.8.8.8:53 {
+    protocol grpc
+}`,
+			false,
+		},
+		{
+			`
+proxy . 8.8.8.8:53 {
+    protocol grpc insecure
+}`,
+			false,
+		},
+		{
+			`
+proxy . 8.8.8.8:53 {
+    protocol grpc TEMPDIR/ca.pem
+}`,
+			false,
+		},
+		{
+			`
+proxy . 8.8.8.8:53 {
+    protocol grpc TEMPDIR/cert.pem TEMPDIR/key.pem
+}`,
+			false,
+		},
+		{
+			`
+proxy . 8.8.8.8:53 {
+    protocol grpc TEMPDIR/cert.pem TEMPDIR/key.pem TEMPDIR/ca.pem
+}`,
+			false,
+		},
+		{
+			`
+proxy . 8.8.8.8:53 {
+    protocol grpc TEMPDIR/cert.pem TEMPDIR/key.pem TEMPDIR/ca.pem TEMPDIR/junk.pem
+}`,
+			true,
+		},
+		{
+			`
+proxy . 8.8.8.8:53 {
+    protocol bogus
+}`,
+			true,
+		},
 	}
+	tempDir, rmFunc, err := testlib.WritePEMFiles("")
+	if err != nil {
+		t.Fatalf("Could not write PEM files: %s", err)
+	}
+	defer rmFunc()
 	for i, test := range tests {
-		c := caddy.NewTestController("dns", test.inputUpstreams)
+		config := strings.Replace(test.inputUpstreams, "TEMPDIR", tempDir, -1)
+		c := caddy.NewTestController("dns", config)
 		_, err := NewStaticUpstreams(&c.Dispenser)
 		if (err != nil) != test.shouldErr {
 			t.Errorf("Test %d expected no error, got %v", i+1, err)
