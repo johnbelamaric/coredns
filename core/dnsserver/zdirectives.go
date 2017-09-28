@@ -14,6 +14,7 @@ var directives = []string{
 	"tls",
 	"root",
 	"bind",
+	"buffer",
 	"debug",
 	"trace",
 	"health",

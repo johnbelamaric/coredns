@@ -7,6 +7,7 @@ import (
 	"net"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/coredns/coredns/plugin"
@@ -38,6 +39,7 @@ type Server struct {
 	trace       trace.Trace        // the trace plugin for the server
 	debug       bool               // disable recover()
 	classChaos  bool               // allow non-INET class queries
+	udpRxSize   int                // receive buffer size for UDP
 }
 
 // NewServer returns a new CoreDNS server and compiles all plugin in to it. By default CH class
@@ -61,6 +63,9 @@ func NewServer(addr string, group []*Config) (*Server, error) {
 	for _, site := range group {
 		if site.Debug {
 			s.debug = true
+		}
+		if site.UDPRxSize > s.udpRxSize {
+			s.udpRxSize = site.UDPRxSize
 		}
 		// set the config per zone
 		s.zones[site.Zone] = site
@@ -105,6 +110,21 @@ func (s *Server) Serve(l net.Listener) error {
 // ServePacket starts the server with an existing packetconn. It blocks until the server stops.
 // This implements caddy.UDPServer interface.
 func (s *Server) ServePacket(p net.PacketConn) error {
+	if c, ok := p.(*net.UDPConn); ok {
+		if s.udpRxSize > 0 {
+			err := c.SetReadBuffer(s.udpRxSize)
+			f, _ := c.File()
+			post, _ := syscall.GetsockoptInt(int(f.Fd()), syscall.SOL_SOCKET, syscall.SO_SNDBUF)
+			f.Close()
+			if post != s.udpRxSize {
+				fmt.Printf("[WARNING] Could not change UDP receive buffer to %d, it is %d", s.udpRxSize, post)
+				if err != nil {
+					fmt.Printf(", error is %s", err)
+				}
+				fmt.Println()
+			}
+		}
+	}
 	s.m.Lock()
 	s.server[udp] = &dns.Server{PacketConn: p, Net: "udp", Handler: dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
 		ctx := context.Background()
