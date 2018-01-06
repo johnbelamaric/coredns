@@ -3,9 +3,9 @@ package plugin
 import "testing"
 
 func TestFallthrough(t *testing.T) {
-        if Fallthrough(nil, "foo.com.") {
-                t.Errorf("Expected false, got true for nil fallthrough")
-        }
+	if Fallthrough(nil, "foo.com.") {
+		t.Errorf("Expected false, got true for nil fallthrough")
+	}
 
 	if !Fallthrough(&[]string{}, "foo.net.") {
 		t.Errorf("Expected true, got false for all zone fallthrough")

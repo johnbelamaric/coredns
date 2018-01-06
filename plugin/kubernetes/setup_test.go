@@ -347,7 +347,7 @@ func TestKubernetesParse(t *testing.T) {
 			defaultResyncPeriod,
 			"",
 			podModeDisabled,
-			&[]string{"ip6.arpa","inaddr.arpa","foo.com"},
+			&[]string{"ip6.arpa", "inaddr.arpa", "foo.com"},
 			nil,
 		},
 		// Valid upstream
