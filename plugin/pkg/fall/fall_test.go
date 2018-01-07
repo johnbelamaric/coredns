@@ -2,6 +2,25 @@ package fall
 
 import "testing"
 
+func TestEqual(t *testing.T) {
+	var z F
+	f := F{Zones:[]string{"example.com."}}
+	g := F{Zones:[]string{"example.net."}}
+	h := F{Zones:[]string{"example.com."}}
+
+	if !f.Equal(h) {
+		t.Errorf("%v should equal %v", f, h)
+	}
+
+	if z.Equal(f) {
+		t.Errorf("%v should not be equal to %v", z, f)
+	}
+
+	if f.Equal(g) {
+		t.Errorf("%v should not be equal to %v", f, g)
+	}
+}
+
 func TestZero(t *testing.T) {
 	var f F
 	if !f.Equal(Zero()) {
