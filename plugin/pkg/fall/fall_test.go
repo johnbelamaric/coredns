@@ -4,9 +4,9 @@ import "testing"
 
 func TestEqual(t *testing.T) {
 	var z F
-	f := F{Zones:[]string{"example.com."}}
-	g := F{Zones:[]string{"example.net."}}
-	h := F{Zones:[]string{"example.com."}}
+	f := F{Zones: []string{"example.com."}}
+	g := F{Zones: []string{"example.net."}}
+	h := F{Zones: []string{"example.com."}}
 
 	if !f.Equal(h) {
 		t.Errorf("%v should equal %v", f, h)
