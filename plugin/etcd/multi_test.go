@@ -16,7 +16,6 @@ import (
 func TestMultiLookup(t *testing.T) {
 	etc := newEtcdPlugin()
 	etc.Zones = []string{"skydns.test.", "miek.nl."}
-	etc.Fall = fall.New()
 	etc.Next = test.ErrorHandler()
 
 	for _, serv := range servicesMulti {
