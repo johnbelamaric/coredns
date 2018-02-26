@@ -7,6 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/coredns/coredns/plugin/pkg/dnsutil"
+	dnswatch "github.com/coredns/coredns/plugin/pkg/watch"
+
 	api "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -73,6 +76,11 @@ type dnsControl struct {
 	stopLock sync.Mutex
 	shutdown bool
 	stopCh   chan struct{}
+
+	// watch-related items channel
+	watchChan *dnswatch.Chan
+	watched   map[string]bool
+	zones     []string
 }
 
 type dnsControlOpts struct {
@@ -82,14 +90,21 @@ type dnsControlOpts struct {
 	// Label handling.
 	labelSelector *meta.LabelSelector
 	selector      labels.Selector
+	// watch-related items channel
+	watchChan *dnswatch.Chan
+	watched   map[string]bool
+	zones     []string
 }
 
 // newDNSController creates a controller for CoreDNS.
 func newdnsController(kubeClient *kubernetes.Clientset, opts dnsControlOpts) *dnsControl {
 	dns := dnsControl{
-		client:   kubeClient,
-		selector: opts.selector,
-		stopCh:   make(chan struct{}),
+		client:    kubeClient,
+		selector:  opts.selector,
+		stopCh:    make(chan struct{}),
+		watchChan: opts.watchChan,
+		watched:   opts.watched,
+		zones:     opts.zones,
 	}
 
 	dns.svcLister, dns.svcController = cache.NewIndexerInformer(
@@ -491,8 +506,46 @@ func (dns *dnsControl) updateModifed() {
 	atomic.StoreInt64(&dns.modified, unix)
 }
 
-func (dns *dnsControl) Add(obj interface{})    { dns.updateModifed() }
-func (dns *dnsControl) Delete(obj interface{}) { dns.updateModifed() }
+func (dns *dnsControl) sendServiceUpdates(s *api.Service) {
+	z := []string{}
+	for i := range dns.zones {
+		//TODO: Need a common way to form names, we do this in XFR and here and in normal lookups...
+		name := dnsutil.Join(append([]string{}, s.ObjectMeta.Name, s.ObjectMeta.Namespace, `svc`, dns.zones[i]))
+		if _, ok := dns.watched[name]; ok {
+			z = append(z, name)
+		}
+	}
+	if len(z) > 0 {
+		*dns.watchChan <- z
+	}
+}
+
+func (dns *dnsControl) sendEndpointsUpdates(ep *api.Endpoints) {
+	//TODO: implement this
+	// TEST
+}
+
+// sendUpdates sends a notification to the server if a watch
+// is enabled for the qname
+func (dns *dnsControl) sendUpdates(obj interface{}) {
+	switch o := obj.(type) {
+	case *api.Service:
+		dns.sendServiceUpdates(o)
+	case *api.Endpoints:
+		dns.sendEndpointsUpdates(o)
+	default:
+		fmt.Printf("Updates for %T not supported.", o)
+	}
+}
+
+func (dns *dnsControl) Add(obj interface{}) {
+	dns.updateModifed()
+	dns.sendUpdates(obj)
+}
+func (dns *dnsControl) Delete(obj interface{}) {
+	dns.updateModifed()
+	dns.sendUpdates(obj)
+}
 
 func (dns *dnsControl) Update(objOld, newObj interface{}) {
 	// endpoint updates can come frequently, make sure
@@ -504,6 +557,9 @@ func (dns *dnsControl) Update(objOld, newObj interface{}) {
 		}
 	}
 	dns.updateModifed()
+
+	// names don't change, so just send new
+	dns.sendUpdates(newObj)
 }
 
 // endpointsEquivalent checks if the update to an endpoint is something
