@@ -301,6 +301,20 @@ func (k *Kubernetes) Records(state request.Request, exact bool) ([]msg.Service, 
 	return services, err
 }
 
+
+func (k *Kubernetes) ServiceFQDN(s api.Service, zone string) string {
+	return dnsutil.Join(append([]string{}, s.ObjectMeta.Name, s.ObjectMeta.Namespace, Svc, zone))
+}
+
+func (k *Kubernetes) EndpointsFQDNs(e api.Endpoints, zone string) (r []string) {
+	for _, es := range e.Subsets {
+		for _, a := range es.Addresses {
+			r = append(r, dnsutil.Join(append([]string{}, endpointHostname(a, k.endpointNameMode), e.ObjectMeta.Name, e.ObjectMeta.Namespace, Svc, zone)))
+		}
+	}
+	return r
+}
+
 func endpointHostname(addr api.EndpointAddress, endpointNameMode bool) string {
 	if addr.Hostname != "" {
 		return strings.ToLower(addr.Hostname)
