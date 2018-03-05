@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coredns/coredns/plugin/pkg/dnsutil"
 	dnswatch "github.com/coredns/coredns/plugin/pkg/watch"
 
 	api "k8s.io/api/core/v1"
@@ -81,6 +80,7 @@ type dnsControl struct {
 	watchChan *dnswatch.Chan
 	watched   map[string]bool
 	zones     []string
+	endpointNameMode bool
 }
 
 type dnsControlOpts struct {
@@ -94,6 +94,7 @@ type dnsControlOpts struct {
 	watchChan *dnswatch.Chan
 	watched   map[string]bool
 	zones     []string
+	endpointNameMode bool
 }
 
 // newDNSController creates a controller for CoreDNS.
@@ -105,6 +106,7 @@ func newdnsController(kubeClient *kubernetes.Clientset, opts dnsControlOpts) *dn
 		watchChan: opts.watchChan,
 		watched:   opts.watched,
 		zones:     opts.zones,
+		endpointNameMode: opts.endpointNameMode,
 	}
 
 	dns.svcLister, dns.svcController = cache.NewIndexerInformer(
@@ -507,10 +509,9 @@ func (dns *dnsControl) updateModifed() {
 }
 
 func (dns *dnsControl) sendServiceUpdates(s *api.Service) {
-	z := []string{}
+	var z []string
 	for i := range dns.zones {
-		//TODO: Need a common way to form names, we do this in XFR and here and in normal lookups...
-		name := dnsutil.Join(append([]string{}, s.ObjectMeta.Name, s.ObjectMeta.Namespace, `svc`, dns.zones[i]))
+		name := ServiceFQDN(s, dns.zones[i])
 		if _, ok := dns.watched[name]; ok {
 			z = append(z, name)
 		}
@@ -521,45 +522,121 @@ func (dns *dnsControl) sendServiceUpdates(s *api.Service) {
 }
 
 func (dns *dnsControl) sendEndpointsUpdates(ep *api.Endpoints) {
-	//TODO: implement this
-	// TEST
+	var z []string
+	for _, zone := range dns.zones {
+		names := append(EndpointFQDN(ep, zone, dns.endpointNameMode), ServiceFQDN(ep, zone))
+		for _, name := range names {
+			if _, ok := dns.watched[name]; ok {
+				z = append(z, name)
+			}
+		}
+	}
+	if len(z) > 0 {
+		*dns.watchChan <- z
+	}
+}
+
+func mergeSubsets(a, b *api.Endpoints) *api.Endpoints {
+	c := b.DeepCopy()
+	c.Subsets = []api.EndpointSubset{}
+
+	for _, s := range a.Subsets {
+		for _, t := range b.Subsets {
+			if subsetsEquivalent(s, t) {
+				break
+			}
+		}
+		c.Subsets = append(c.Subsets, s)
+	}
+
+	for _, s := range b.Subsets {
+		for _, t := range a.Subsets {
+			if subsetsEquivalent(s, t) {
+				break
+			}
+		}
+		c.Subsets = append(c.Subsets, s)
+	}
+	return c
 }
 
 // sendUpdates sends a notification to the server if a watch
 // is enabled for the qname
-func (dns *dnsControl) sendUpdates(obj interface{}) {
-	switch o := obj.(type) {
+func (dns *dnsControl) sendUpdates(oldObj, newObj interface{}) {
+	// If both objects have the same resource version, they are identical.
+	if newObj != nil && oldObj != nil && (oldObj.(meta.Object).GetResourceVersion() == newObj.(meta.Object).GetResourceVersion()) {
+		return
+	}
+	obj := newObj
+	if obj == nil {
+		obj = oldObj
+	}
+	switch ob := obj.(type) {
 	case *api.Service:
-		dns.sendServiceUpdates(o)
+		dns.sendServiceUpdates(ob)
 	case *api.Endpoints:
-		dns.sendEndpointsUpdates(o)
+		if newObj == nil || oldObj == nil {
+			dns.sendEndpointsUpdates(ob)
+			return
+		}
+		p := oldObj.(*api.Endpoints)
+		// endpoint updates can come frequently, make sure it's a change we care about
+		if endpointsEquivalent(p, ob) {
+			return
+		}
+		dns.sendEndpointsUpdates(mergeSubsets(p, ob))
+		return
+
 	default:
-		fmt.Printf("Updates for %T not supported.", o)
+		fmt.Printf("Updates for %T not supported.", ob)
 	}
 }
 
 func (dns *dnsControl) Add(obj interface{}) {
 	dns.updateModifed()
-	dns.sendUpdates(obj)
+	dns.sendUpdates(nil, obj)
 }
 func (dns *dnsControl) Delete(obj interface{}) {
 	dns.updateModifed()
-	dns.sendUpdates(obj)
+	dns.sendUpdates(obj, nil)
 }
 
-func (dns *dnsControl) Update(objOld, newObj interface{}) {
-	// endpoint updates can come frequently, make sure
-	// it's a change we care about
-	if o, ok := objOld.(*api.Endpoints); ok {
-		n := newObj.(*api.Endpoints)
-		if endpointsEquivalent(o, n) {
-			return
+func (dns *dnsControl) Update(oldObj, newObj interface{}) {
+	dns.updateModifed()
+	dns.sendUpdates(oldObj, newObj)
+}
+
+func subsetsEquivalent(sa, sb api.EndpointSubset) bool {
+	if len(sa.Addresses) != len(sb.Addresses) {
+		return false
+	}
+	if len(sa.Ports) != len(sb.Ports) {
+		return false
+	}
+
+	for addr, aaddr := range sa.Addresses {
+		baddr := sb.Addresses[addr]
+		if aaddr.IP != baddr.IP {
+			return false
+		}
+		if aaddr.Hostname != baddr.Hostname {
+			return false
 		}
 	}
-	dns.updateModifed()
 
-	// names don't change, so just send new
-	dns.sendUpdates(newObj)
+	for port, aport := range sa.Ports {
+		bport := sb.Ports[port]
+		if aport.Name != bport.Name {
+			return false
+		}
+		if aport.Port != bport.Port {
+			return false
+		}
+		if aport.Protocol != bport.Protocol {
+			return false
+		}
+	}
+	return true
 }
 
 // endpointsEquivalent checks if the update to an endpoint is something
@@ -576,34 +653,8 @@ func endpointsEquivalent(a, b *api.Endpoints) bool {
 	for i, sa := range a.Subsets {
 		// check the Addresses and Ports. Ignore unready addresses.
 		sb := b.Subsets[i]
-		if len(sa.Addresses) != len(sb.Addresses) {
+		if !subsetsEquivalent(sa, sb) {
 			return false
-		}
-		if len(sa.Ports) != len(sb.Ports) {
-			return false
-		}
-
-		for addr, aaddr := range sa.Addresses {
-			baddr := sb.Addresses[addr]
-			if aaddr.IP != baddr.IP {
-				return false
-			}
-			if aaddr.Hostname != baddr.Hostname {
-				return false
-			}
-		}
-
-		for port, aport := range sa.Ports {
-			bport := sb.Ports[port]
-			if aport.Name != bport.Name {
-				return false
-			}
-			if aport.Port != bport.Port {
-				return false
-			}
-			if aport.Protocol != bport.Protocol {
-				return false
-			}
 		}
 	}
 	return true

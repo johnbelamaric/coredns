@@ -269,6 +269,7 @@ func (k *Kubernetes) InitKubeCache() (err error) {
 	k.opts.watchChan = &(k.watchChan)
 	k.opts.watched = k.watched
 	k.opts.zones = k.Zones
+	k.opts.endpointNameMode = k.endpointNameMode
 	k.APIConn = newdnsController(kubeClient, k.opts)
 
 	return err
@@ -301,18 +302,18 @@ func (k *Kubernetes) Records(state request.Request, exact bool) ([]msg.Service, 
 	return services, err
 }
 
-
-func (k *Kubernetes) ServiceFQDN(s api.Service, zone string) string {
-	return dnsutil.Join(append([]string{}, s.ObjectMeta.Name, s.ObjectMeta.Namespace, Svc, zone))
+func ServiceFQDN(obj meta.Object, zone string) string {
+	return dnsutil.Join(append([]string{}, obj.GetName(), obj.GetNamespace(), Svc, zone))
 }
 
-func (k *Kubernetes) EndpointsFQDNs(e api.Endpoints, zone string) (r []string) {
-	for _, es := range e.Subsets {
-		for _, a := range es.Addresses {
-			r = append(r, dnsutil.Join(append([]string{}, endpointHostname(a, k.endpointNameMode), e.ObjectMeta.Name, e.ObjectMeta.Namespace, Svc, zone)))
+func EndpointFQDN(ep *api.Endpoints, zone string, endpointNameMode bool) []string {
+	var names []string
+	for _, ss := range ep.Subsets{
+		for _, addr := range ss.Addresses {
+			names = append(names, dnsutil.Join(append([]string{}, endpointHostname(addr, endpointNameMode), ServiceFQDN(ep, zone))))
 		}
 	}
-	return r
+	return names
 }
 
 func endpointHostname(addr api.EndpointAddress, endpointNameMode bool) string {
