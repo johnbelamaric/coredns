@@ -78,10 +78,10 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 			}
 
 			qname := msg.Question[0].Name
+			w.mutex.Lock()
 			if _, ok := w.watches[qname]; !ok {
 				w.watches[qname] = make(watchlist)
 			}
-
 			w.watches[qname][id] = stream
 
 			for _, p := range w.plugins {
@@ -92,12 +92,13 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 			}
 
 			log.Printf("watches: %v\n", w.watches)
+			w.mutex.Unlock()
 			continue
 		}
 
 		cancel := in.GetCancelRequest()
 		if cancel != nil {
-			//TODO: lock
+			w.mutex.Lock()
 			for qname, wl := range w.watches {
 				ws, ok := wl[cancel.WatchId]
 				if !ok {
@@ -125,6 +126,7 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 				}
 			}
 			log.Printf("watches: %v\n", w.watches)
+			w.mutex.Unlock()
 			continue
 		}
 	}
@@ -134,6 +136,7 @@ func (w *watcher) processWatches() {
 	for {
 		select {
 		case changed := <-w.changes:
+			w.mutex.Lock()
 			log.Printf("Change: %v, checking watches in %v\n", changed, w.watches)
 			for qname, wl := range w.watches {
 				log.Printf("Checking %s against %s\n", changed, qname)
@@ -151,6 +154,7 @@ func (w *watcher) processWatches() {
 					}
 				}
 			}
+			w.mutex.Unlock()
 		}
 	}
 }

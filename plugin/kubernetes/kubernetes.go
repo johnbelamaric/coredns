@@ -310,7 +310,7 @@ func ServiceFQDN(obj meta.Object, zone string) string {
 // EndpointFQDN returns a list of k8s cluster dns spec service FQDNs for each subset in the endpoint
 func EndpointFQDN(ep *api.Endpoints, zone string, endpointNameMode bool) []string {
 	var names []string
-	for _, ss := range ep.Subsets{
+	for _, ss := range ep.Subsets {
 		for _, addr := range ss.Addresses {
 			names = append(names, dnsutil.Join(append([]string{}, endpointHostname(addr, endpointNameMode), ServiceFQDN(ep, zone))))
 		}

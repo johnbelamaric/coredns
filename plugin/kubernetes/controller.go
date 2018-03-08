@@ -536,6 +536,7 @@ func (dns *dnsControl) sendEndpointsUpdates(ep *api.Endpoints) {
 	}
 }
 
+// xorSubsets returns an endpoints struct containing the Subsets that have changed (xor) between a and b
 func xorSubsets(a, b *api.Endpoints) *api.Endpoints {
 	c := b.DeepCopy()
 	c.Subsets = []api.EndpointSubset{}
@@ -596,12 +597,14 @@ func (dns *dnsControl) Delete(obj interface{}) {
 	dns.updateModifed()
 	dns.sendUpdates(obj, nil)
 }
-
 func (dns *dnsControl) Update(oldObj, newObj interface{}) {
 	dns.updateModifed()
 	dns.sendUpdates(oldObj, newObj)
 }
 
+// subsetsEquivalent checks if two endpoint subsets are significantly equivalent
+// I.e. that they have the same ready addresses, host names, ports (including protocol
+// and service names for SRV)
 func subsetsEquivalent(sa, sb api.EndpointSubset) bool {
 	if len(sa.Addresses) != len(sb.Addresses) {
 		return false
@@ -610,6 +613,9 @@ func subsetsEquivalent(sa, sb api.EndpointSubset) bool {
 		return false
 	}
 
+	// in Addresses and Ports, we should be able to rely on
+	// these being sorted and able to be compared
+	// they are supposed to be in a canonical format
 	for addr, aaddr := range sa.Addresses {
 		baddr := sb.Addresses[addr]
 		if aaddr.IP != baddr.IP {
@@ -636,18 +642,17 @@ func subsetsEquivalent(sa, sb api.EndpointSubset) bool {
 }
 
 // endpointsEquivalent checks if the update to an endpoint is something
-// that matters to us: ready addresses, host names, ports (including names for SRV)
+// that matters to us or if they are effectively equivalent.
 func endpointsEquivalent(a, b *api.Endpoints) bool {
-	// supposedly we should be able to rely on
-	// these being sorted and able to be compared
-	// they are supposed to be in a canonical format
 
 	if len(a.Subsets) != len(b.Subsets) {
 		return false
 	}
 
+	// we should be able to rely on
+	// these being sorted and able to be compared
+	// they are supposed to be in a canonical format
 	for i, sa := range a.Subsets {
-		// check the Addresses and Ports. Ignore unready addresses.
 		sb := b.Subsets[i]
 		if !subsetsEquivalent(sa, sb) {
 			return false

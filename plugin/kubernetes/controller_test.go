@@ -38,14 +38,14 @@ func TestXorSubsets(t *testing.T) {
 			api.Endpoints{Subsets: endpointSubsets("10.0.0.1:80", "10.0.0.2:8080")},
 		},
 		{ // From a->b: One goes away, one is new
-			api.Endpoints{Subsets: endpointSubsets( "10.0.0.2:8080")},
+			api.Endpoints{Subsets: endpointSubsets("10.0.0.2:8080")},
 			api.Endpoints{Subsets: endpointSubsets("10.0.0.1:80")},
-			api.Endpoints{Subsets: endpointSubsets( "10.0.0.2:8080", "10.0.0.1:80")},
+			api.Endpoints{Subsets: endpointSubsets("10.0.0.2:8080", "10.0.0.1:80")},
 		},
 	}
 
 	for i, te := range tests {
-		got := xorSubsets(&te.a,&te.b)
+		got := xorSubsets(&te.a, &te.b)
 		if !endpointsEquivalent(got, &te.expected) {
 			t.Errorf("Expected '%v' for test %v, got '%v'.", te.expected, i, got)
 		}
