@@ -77,9 +77,9 @@ type dnsControl struct {
 	stopCh   chan struct{}
 
 	// watch-related items channel
-	watchChan *dnswatch.Chan
-	watched   map[string]bool
-	zones     []string
+	watchChan        *dnswatch.Chan
+	watched          map[string]bool
+	zones            []string
 	endpointNameMode bool
 }
 
@@ -91,21 +91,21 @@ type dnsControlOpts struct {
 	labelSelector *meta.LabelSelector
 	selector      labels.Selector
 	// watch-related items channel
-	watchChan *dnswatch.Chan
-	watched   map[string]bool
-	zones     []string
+	watchChan        *dnswatch.Chan
+	watched          map[string]bool
+	zones            []string
 	endpointNameMode bool
 }
 
 // newDNSController creates a controller for CoreDNS.
 func newdnsController(kubeClient *kubernetes.Clientset, opts dnsControlOpts) *dnsControl {
 	dns := dnsControl{
-		client:    kubeClient,
-		selector:  opts.selector,
-		stopCh:    make(chan struct{}),
-		watchChan: opts.watchChan,
-		watched:   opts.watched,
-		zones:     opts.zones,
+		client:           kubeClient,
+		selector:         opts.selector,
+		stopCh:           make(chan struct{}),
+		watchChan:        opts.watchChan,
+		watched:          opts.watched,
+		zones:            opts.zones,
 		endpointNameMode: opts.endpointNameMode,
 	}
 
@@ -536,26 +536,22 @@ func (dns *dnsControl) sendEndpointsUpdates(ep *api.Endpoints) {
 	}
 }
 
-func mergeSubsets(a, b *api.Endpoints) *api.Endpoints {
+func xorSubsets(a, b *api.Endpoints) *api.Endpoints {
 	c := b.DeepCopy()
 	c.Subsets = []api.EndpointSubset{}
 
-	for _, s := range a.Subsets {
-		for _, t := range b.Subsets {
-			if subsetsEquivalent(s, t) {
-				break
+	for _, abba := range [][]*api.Endpoints{{a, b}, {b, a}} {
+		a := abba[0]
+		b := abba[1]
+	left:
+		for _, as := range a.Subsets {
+			for _, bs := range b.Subsets {
+				if subsetsEquivalent(as, bs) {
+					continue left
+				}
 			}
+			c.Subsets = append(c.Subsets, as)
 		}
-		c.Subsets = append(c.Subsets, s)
-	}
-
-	for _, s := range b.Subsets {
-		for _, t := range a.Subsets {
-			if subsetsEquivalent(s, t) {
-				break
-			}
-		}
-		c.Subsets = append(c.Subsets, s)
 	}
 	return c
 }
@@ -584,7 +580,7 @@ func (dns *dnsControl) sendUpdates(oldObj, newObj interface{}) {
 		if endpointsEquivalent(p, ob) {
 			return
 		}
-		dns.sendEndpointsUpdates(mergeSubsets(p, ob))
+		dns.sendEndpointsUpdates(xorSubsets(p, ob))
 		return
 
 	default:
