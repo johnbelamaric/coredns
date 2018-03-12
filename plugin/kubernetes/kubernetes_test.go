@@ -390,3 +390,52 @@ func TestServices(t *testing.T) {
 		}
 	}
 }
+
+func TestServiceFQDN(t *testing.T) {
+	fqdn := ServiceFQDN(
+		&api.Service{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "svc1",
+				Namespace: "testns",
+			},
+		}, "cluster.local")
+
+	expected := "svc1.testns.svc.cluster.local."
+	if fqdn != expected {
+		t.Errorf("Expected '%v', got '%v'.", expected, fqdn)
+	}
+}
+
+func TestEndpointFQDN(t *testing.T) {
+	fqdns := EndpointFQDN(
+		&api.Endpoints{
+			Subsets: []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{
+						{
+							IP:       "172.0.0.1",
+							Hostname: "ep1a",
+						},
+						{
+							IP:       "172.0.0.2",
+						},
+					},
+				},
+			},
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "svc1",
+				Namespace: "testns",
+			},
+		}, "cluster.local", false)
+
+	expected := []string{
+		"ep1a.svc1.testns.svc.cluster.local.",
+		"172-0-0-2.svc1.testns.svc.cluster.local.",
+	}
+
+	for i := range fqdns {
+		if fqdns[i] != expected[i] {
+			t.Errorf("Expected '%v', got '%v'.", expected[i], fqdns[i])
+		}
+	}
+}

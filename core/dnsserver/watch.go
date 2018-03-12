@@ -68,11 +68,10 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 			err := msg.Unpack(create.Query.Msg)
 			if err != nil {
 				// TODO: should write back an error response not break the stream
-				return err
+				stream.Send(&pb.WatchResponse{Created: false})
+				return nil
 			}
-
 			id := w.nextID()
-
 			if err := stream.Send(&pb.WatchResponse{WatchId: id, Created: true}); err != nil {
 				return err
 			}

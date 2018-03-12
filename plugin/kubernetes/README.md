@@ -102,6 +102,10 @@ kubernetes [ZONES...] {
 This plugin implements dynamic health checking. Currently this is limited to reporting healthy when
 the API has synced.
 
+## Watch
+
+This plugin implements watch. See coredns/coredns/client/dnsgrpc/README.go
+
 ## Examples
 
 Handle all queries in the `cluster.local` zone. Connect to Kubernetes in-cluster. Also handle all
