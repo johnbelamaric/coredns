@@ -406,6 +406,39 @@ func TestServiceFQDN(t *testing.T) {
 	}
 }
 
+func TestPodFQDN(t *testing.T) {
+	fqdn := PodFQDN(
+		&api.Pod{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "pod1",
+				Namespace: "testns",
+			},
+			Status: api.PodStatus{
+				PodIP: "10.10.0.10",
+			},
+		}, "cluster.local")
+
+	expected := "10-10-0-10.testns.pod.cluster.local."
+	if fqdn != expected {
+		t.Errorf("Expected '%v', got '%v'.", expected, fqdn)
+	}
+	fqdn = PodFQDN(
+		&api.Pod{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "pod1",
+				Namespace: "testns",
+			},
+			Status: api.PodStatus{
+				PodIP: "aaaa:bbbb:cccc::zzzz",
+			},
+		}, "cluster.local")
+
+	expected = "aaaa-bbbb-cccc--zzzz.testns.pod.cluster.local."
+	if fqdn != expected {
+		t.Errorf("Expected '%v', got '%v'.", expected, fqdn)
+	}
+}
+
 func TestEndpointFQDN(t *testing.T) {
 	fqdns := EndpointFQDN(
 		&api.Endpoints{

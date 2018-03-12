@@ -104,7 +104,8 @@ the API has synced.
 
 ## Watch
 
-This plugin implements watch. See coredns/coredns/client/dnsgrpc/README.go
+This plugin implements watch. A client that connects to CoreDNS using `coredns/client` can be notified
+of changes to A, AAAA, and SRV records for Kubernetes services and endpoints.
 
 ## Examples
 

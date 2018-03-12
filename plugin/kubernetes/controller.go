@@ -521,6 +521,19 @@ func (dns *dnsControl) sendServiceUpdates(s *api.Service) {
 	}
 }
 
+func (dns *dnsControl) sendPodUpdates(p *api.Pod) {
+	var z []string
+	for i := range dns.zones {
+		name := PodFQDN(p, dns.zones[i])
+		if _, ok := dns.watched[name]; ok {
+			z = append(z, name)
+		}
+	}
+	if len(z) > 0 {
+		*dns.watchChan <- z
+	}
+}
+
 func (dns *dnsControl) sendEndpointsUpdates(ep *api.Endpoints) {
 	var z []string
 	for _, zone := range dns.zones {
@@ -582,8 +595,8 @@ func (dns *dnsControl) sendUpdates(oldObj, newObj interface{}) {
 			return
 		}
 		dns.sendEndpointsUpdates(xorSubsets(p, ob))
-		return
-
+	case *api.Pod:
+		dns.sendPodUpdates(ob)
 	default:
 		fmt.Printf("Updates for %T not supported.", ob)
 	}

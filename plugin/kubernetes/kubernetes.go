@@ -307,6 +307,13 @@ func ServiceFQDN(obj meta.Object, zone string) string {
 	return dnsutil.Join(append([]string{}, obj.GetName(), obj.GetNamespace(), Svc, zone))
 }
 
+// PodFQDN returns the k8s cluster dns spec FQDN for the pod
+func PodFQDN(p *api.Pod, zone string) string {
+	name := strings.Replace(p.Status.PodIP, ".", "-", -1)
+	name = strings.Replace(name, ":", "-", -1)
+	return dnsutil.Join(append([]string{}, name, p.GetNamespace(), Pod, zone))
+}
+
 // EndpointFQDN returns a list of k8s cluster dns spec service FQDNs for each subset in the endpoint
 func EndpointFQDN(ep *api.Endpoints, zone string, endpointNameMode bool) []string {
 	var names []string
