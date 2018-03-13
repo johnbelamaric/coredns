@@ -90,7 +90,6 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 				}
 			}
 
-			log.Printf("watches: %v\n", w.watches)
 			w.mutex.Unlock()
 			continue
 		}
@@ -124,7 +123,6 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 					return err
 				}
 			}
-			log.Printf("watches: %v\n", w.watches)
 			w.mutex.Unlock()
 			continue
 		}
@@ -136,18 +134,14 @@ func (w *watcher) processWatches() {
 		select {
 		case changed := <-w.changes:
 			w.mutex.Lock()
-			log.Printf("Change: %v, checking watches in %v\n", changed, w.watches)
 			for qname, wl := range w.watches {
-				log.Printf("Checking %s against %s\n", changed, qname)
 				if plugin.Zones(changed).Matches(qname) == "" {
 					continue
 				}
 				log.Printf("Matches %s\n", qname)
 				for id, stream := range wl {
 					wr := pb.WatchResponse{WatchId: id, Qname: qname}
-					log.Printf("Sending %v over %v\n", wr, stream)
 					err := stream.Send(&wr)
-					log.Printf("Sent, err = %s", err)
 					if err != nil {
 						log.Printf("Error sending to watch %d: %s\n", id, err)
 					}
