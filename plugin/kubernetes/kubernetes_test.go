@@ -450,7 +450,7 @@ func TestEndpointFQDN(t *testing.T) {
 							Hostname: "ep1a",
 						},
 						{
-							IP:       "172.0.0.2",
+							IP: "172.0.0.2",
 						},
 					},
 				},

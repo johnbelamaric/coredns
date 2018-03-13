@@ -18,7 +18,7 @@ func endpointSubsets(addrs ...string) (eps []api.EndpointSubset) {
 	return eps
 }
 
-func TestXorSubsets(t *testing.T) {
+func TestEndpointsSubsetDiffs(t *testing.T) {
 	var tests = []struct {
 		a, b, expected api.Endpoints
 	}{
@@ -45,7 +45,7 @@ func TestXorSubsets(t *testing.T) {
 	}
 
 	for i, te := range tests {
-		got := xorSubsets(&te.a, &te.b)
+		got := endpointsSubsetDiffs(&te.a, &te.b)
 		if !endpointsEquivalent(got, &te.expected) {
 			t.Errorf("Expected '%v' for test %v, got '%v'.", te.expected, i, got)
 		}

@@ -549,11 +549,19 @@ func (dns *dnsControl) sendEndpointsUpdates(ep *api.Endpoints) {
 	}
 }
 
-// xorSubsets returns an endpoints struct containing the Subsets that have changed (xor) between a and b
-func xorSubsets(a, b *api.Endpoints) *api.Endpoints {
+// endpointsSubsetDiffs returns an Endpoints struct containing the Subsets that have changed between a and b.
+// When we notify clients of changed endpoints we only want to notify them of endpoints that have changed.
+// The Endpoints API object holds more than one endpoint, held in a list of Subsets.  Each Subset refers to
+// an endpoint.  So, here we create a new Endpoints struct, and populate it with only the endpoints that have changed.
+// This new Endpoints object is later used to generate the list of endpoint FQDNs to send to the client.
+// This function computes this literally by combining the sets (in a and not in b) union (in b and not in a).
+func endpointsSubsetDiffs(a, b *api.Endpoints) *api.Endpoints {
 	c := b.DeepCopy()
 	c.Subsets = []api.EndpointSubset{}
 
+	// In the following loop, the first iteration computes (in a but not in b).
+	// The second iteration then adds (in b but not in a)
+	// The end result is an Endpoints that only contains the subsets (endpoints) that are different between a and b.
 	for _, abba := range [][]*api.Endpoints{{a, b}, {b, a}} {
 		a := abba[0]
 		b := abba[1]
@@ -583,9 +591,11 @@ func (dns *dnsControl) sendUpdates(oldObj, newObj interface{}) {
 	}
 	switch ob := obj.(type) {
 	case *api.Service:
+		dns.updateModifed()
 		dns.sendServiceUpdates(ob)
 	case *api.Endpoints:
 		if newObj == nil || oldObj == nil {
+			dns.updateModifed()
 			dns.sendEndpointsUpdates(ob)
 			return
 		}
@@ -594,24 +604,23 @@ func (dns *dnsControl) sendUpdates(oldObj, newObj interface{}) {
 		if endpointsEquivalent(p, ob) {
 			return
 		}
-		dns.sendEndpointsUpdates(xorSubsets(p, ob))
+		dns.updateModifed()
+		dns.sendEndpointsUpdates(endpointsSubsetDiffs(p, ob))
 	case *api.Pod:
+		dns.updateModifed()
 		dns.sendPodUpdates(ob)
 	default:
-		fmt.Printf("Updates for %T not supported.", ob)
+		fmt.Printf("[WARNING] Updates for %T not supported.", ob)
 	}
 }
 
 func (dns *dnsControl) Add(obj interface{}) {
-	dns.updateModifed()
 	dns.sendUpdates(nil, obj)
 }
 func (dns *dnsControl) Delete(obj interface{}) {
-	dns.updateModifed()
 	dns.sendUpdates(obj, nil)
 }
 func (dns *dnsControl) Update(oldObj, newObj interface{}) {
-	dns.updateModifed()
 	dns.sendUpdates(oldObj, newObj)
 }
 

@@ -51,8 +51,7 @@ func (w *watcher) nextID() int64 {
 	return id
 }
 
-// watch is used to monitor the results of a given query. CoreDNS will push updated
-// query responses down the stream.
+// watch is used to monitor the results of a given query.
 func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 	for {
 		in, err := stream.Recv()
@@ -82,6 +81,7 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 				w.watches[qname] = make(watchlist)
 			}
 			w.watches[qname][id] = stream
+			w.mutex.Unlock()
 
 			for _, p := range w.plugins {
 				err := p.Watch(qname)
@@ -89,8 +89,6 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 					log.Printf("[WARNING] Failed to start watch for %s in plugin %s: %s\n", qname, p.Name(), err)
 				}
 			}
-
-			w.mutex.Unlock()
 			continue
 		}
 
@@ -138,7 +136,6 @@ func (w *watcher) processWatches() {
 				if plugin.Zones(changed).Matches(qname) == "" {
 					continue
 				}
-				log.Printf("Matches %s\n", qname)
 				for id, stream := range wl {
 					wr := pb.WatchResponse{WatchId: id, Qname: qname}
 					err := stream.Send(&wr)
