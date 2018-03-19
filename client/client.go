@@ -28,6 +28,7 @@ type Watch struct {
 }
 
 // NewClient establishes a connection to a server and returns a pointer to a Client.
+// TODO: add a []grpc.DialOption parameter that we append all our options to. This way they can set backoff policies, etc.
 func NewClient(endpoint, cert, key, ca string) (*Client, error) {
 	var tlsargs []string
 	if cert != "" {
@@ -123,6 +124,12 @@ func (c *Client) Watch(req *dns.Msg) (*Watch, error) {
 			}
 			if err != nil {
 				log.Printf("[ERROR] Watch %d failed to receive from gRPC stream: %s\n", w.WatchID, err)
+				close(w.Msgs)
+				return
+			}
+
+			if in.Err != "" {
+				log.Printf("[ERROR] Watch %d got error from server: %v\n", w.WatchID, in.Err)
 				close(w.Msgs)
 				return
 			}

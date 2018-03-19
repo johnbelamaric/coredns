@@ -44,5 +44,6 @@ message WatchResponse {
 	bool canceled = 3;
 
 	string qname = 4;
-	//DnsPacket reply = 6;
+
+	string err = 5;
 }

@@ -1,6 +1,7 @@
 package dnsserver
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -66,13 +67,14 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 			msg := new(dns.Msg)
 			err := msg.Unpack(create.Query.Msg)
 			if err != nil {
-				// TODO: should write back an error response not break the stream
-				stream.Send(&pb.WatchResponse{Created: false})
-				return nil
+				log.Printf("[WARNING] Could not decode watch request: %s\n", err)
+				stream.Send(&pb.WatchResponse{Err: "could not decode request"})
+				continue
 			}
 			id := w.nextID()
 			if err := stream.Send(&pb.WatchResponse{WatchId: id, Created: true}); err != nil {
-				return err
+				// if we fail to notify client of watch creation, don't create the watch
+				continue
 			}
 
 			qname := msg.Question[0].Name
@@ -87,6 +89,7 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 				err := p.Watch(qname)
 				if err != nil {
 					log.Printf("[WARNING] Failed to start watch for %s in plugin %s: %s\n", qname, p.Name(), err)
+					stream.Send(&pb.WatchResponse{Err: fmt.Sprintf("failed to start watch for %s in plugin %s", qname, p.Name())})
 				}
 			}
 			continue
@@ -102,6 +105,7 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 				}
 
 				// only allow cancels from the client that started it
+				// TODO: test what happens if a stream tries to cancel a watchID that it doesn't own
 				if ws != stream {
 					continue
 				}
@@ -117,9 +121,7 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 				}
 
 				// let the client know we canceled the watch
-				if err = stream.Send(&pb.WatchResponse{WatchId: cancel.WatchId, Canceled: true}); err != nil {
-					return err
-				}
+				stream.Send(&pb.WatchResponse{WatchId: cancel.WatchId, Canceled: true})
 			}
 			w.mutex.Unlock()
 			continue
