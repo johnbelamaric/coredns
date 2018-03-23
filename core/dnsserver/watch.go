@@ -142,11 +142,26 @@ func (w *watcher) processWatches() {
 					wr := pb.WatchResponse{WatchId: id, Qname: qname}
 					err := stream.Send(&wr)
 					if err != nil {
-						log.Printf("Error sending to watch %d: %s\n", id, err)
+						log.Printf("[WARNING] Error sending change for %s to watch %d: %s\n", qname, id, err)
 					}
 				}
 			}
 			w.mutex.Unlock()
 		}
 	}
+}
+
+func (w *watcher) stop() {
+	w.mutex.Lock()
+	for wn, wl := range w.watches {
+		for id, stream := range wl {
+			wr := pb.WatchResponse{WatchId: id, Canceled: true}
+			err := stream.Send(&wr)
+			if err != nil {
+				log.Printf("[WARNING] Error notifiying client of cancellation: %s\n", err)
+			}
+		}
+		delete(w.watches, wn)
+	}
+	w.mutex.Unlock()
 }

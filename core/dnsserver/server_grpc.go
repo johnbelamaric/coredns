@@ -101,6 +101,9 @@ func (s *ServergRPC) OnStartupComplete() {
 func (s *ServergRPC) Stop() (err error) {
 	s.m.Lock()
 	defer s.m.Unlock()
+	if s.watch != nil {
+		s.watch.stop()
+	}
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
 	}

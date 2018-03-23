@@ -70,7 +70,16 @@ func main() {
 		}
 
 		for msg := range w.Msgs {
-			printMsg(verbose, msg)
+			if msg.Msg != nil {
+				printMsg(verbose, msg.Msg)
+			}
+			if msg.Err != "" {
+				fmt.Printf("Error: %v\n", msg.Err)
+			}
+			if msg.End {
+				fmt.Println("Watch ended by server. Stopping.")
+				return
+			}
 		}
 	}
 }

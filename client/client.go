@@ -19,10 +19,17 @@ type Client struct {
 	pbClient pb.DnsServiceClient
 }
 
+// Msg holds a message from the server
+type Msg struct {
+	Msg *dns.Msg
+	Err string
+	End bool
+}
+
 // Watch is used to track access results from watching a particular query.
 type Watch struct {
 	WatchID int64
-	Msgs    chan *dns.Msg
+	Msgs    chan *Msg
 	stream  pb.DnsService_WatchClient
 	client  *Client
 }
@@ -114,7 +121,7 @@ func (c *Client) Watch(req *dns.Msg) (*Watch, error) {
 	if !in.Created {
 		return nil, fmt.Errorf("unexpected non-created response from server: %v", in)
 	}
-	w := &Watch{WatchID: in.WatchId, Msgs: make(chan *dns.Msg), stream: stream, client: c}
+	w := &Watch{WatchID: in.WatchId, Msgs: make(chan *Msg), stream: stream, client: c}
 	go func() {
 		for {
 			in, err := w.stream.Recv()
@@ -130,6 +137,7 @@ func (c *Client) Watch(req *dns.Msg) (*Watch, error) {
 
 			if in.Err != "" {
 				log.Printf("[ERROR] Watch %d got error from server: %v\n", w.WatchID, in.Err)
+				w.Msgs <- &Msg{Err: in.Err}
 				close(w.Msgs)
 				return
 			}
@@ -139,7 +147,10 @@ func (c *Client) Watch(req *dns.Msg) (*Watch, error) {
 				close(w.Msgs)
 				return
 			}
+
 			if in.Canceled {
+				log.Printf("Watch %d canceled by server: %v\n", w.WatchID, in)
+				w.Msgs <- &Msg{End: true}
 				close(w.Msgs)
 				return
 			}
@@ -150,7 +161,7 @@ func (c *Client) Watch(req *dns.Msg) (*Watch, error) {
 				close(w.Msgs)
 				return
 			}
-			w.Msgs <- r
+			w.Msgs <- &Msg{Msg: r}
 		}
 	}()
 
