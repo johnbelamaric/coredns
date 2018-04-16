@@ -8,6 +8,7 @@ import (
 	"github.com/coredns/coredns/client"
 
 	"github.com/miekg/dns"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -49,7 +50,7 @@ func main() {
 		fmt.Printf("%s %s records for %s on server %s\n", a, dns.TypeToString[qtype], qname, endpoint)
 	}
 
-	c, err := client.NewClient(endpoint, cert, key, ca)
+	c, err := client.NewClient(endpoint, cert, key, ca, []grpc.DialOption{})
 	if err != nil {
 		panic(err)
 	}
