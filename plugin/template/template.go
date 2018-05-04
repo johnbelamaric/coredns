@@ -8,6 +8,7 @@ import (
 	gotmpl "text/template"
 
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/metrics"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	"github.com/coredns/coredns/plugin/pkg/upstream"
 	"github.com/coredns/coredns/request"
@@ -66,7 +67,7 @@ func (h Handler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 			continue
 		}
 
-		TemplateMatchesCount.WithLabelValues(data.Zone, data.Class, data.Type).Inc()
+		templateMatchesCount.WithLabelValues(metrics.WithServer(ctx), data.Zone, data.Class, data.Type).Inc()
 
 		if template.rcode == dns.RcodeServerFailure {
 			return template.rcode, nil
@@ -74,11 +75,11 @@ func (h Handler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 
 		msg := new(dns.Msg)
 		msg.SetReply(r)
-		msg.Authoritative, msg.RecursionAvailable, msg.Compress = true, true, true
+		msg.Authoritative, msg.RecursionAvailable = true, true
 		msg.Rcode = template.rcode
 
 		for _, answer := range template.answer {
-			rr, err := executeRRTemplate("answer", answer, data)
+			rr, err := executeRRTemplate(metrics.WithServer(ctx), "answer", answer, data)
 			if err != nil {
 				return dns.RcodeServerFailure, err
 			}
@@ -89,14 +90,14 @@ func (h Handler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 			}
 		}
 		for _, additional := range template.additional {
-			rr, err := executeRRTemplate("additional", additional, data)
+			rr, err := executeRRTemplate(metrics.WithServer(ctx), "additional", additional, data)
 			if err != nil {
 				return dns.RcodeServerFailure, err
 			}
 			msg.Extra = append(msg.Extra, rr)
 		}
 		for _, authority := range template.authority {
-			rr, err := executeRRTemplate("authority", authority, data)
+			rr, err := executeRRTemplate(metrics.WithServer(ctx), "authority", authority, data)
 			if err != nil {
 				return dns.RcodeServerFailure, err
 			}
@@ -104,6 +105,7 @@ func (h Handler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 		}
 
 		state.SizeAndDo(msg)
+		state.Scrub(msg)
 		w.WriteMsg(msg)
 		return template.rcode, nil
 	}
@@ -114,16 +116,16 @@ func (h Handler) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 // Name implements the plugin.Handler interface.
 func (h Handler) Name() string { return "template" }
 
-func executeRRTemplate(section string, template *gotmpl.Template, data templateData) (dns.RR, error) {
+func executeRRTemplate(server, section string, template *gotmpl.Template, data templateData) (dns.RR, error) {
 	buffer := &bytes.Buffer{}
 	err := template.Execute(buffer, data)
 	if err != nil {
-		TemplateFailureCount.WithLabelValues(data.Zone, data.Class, data.Type, section, template.Tree.Root.String()).Inc()
+		templateFailureCount.WithLabelValues(server, data.Zone, data.Class, data.Type, section, template.Tree.Root.String()).Inc()
 		return nil, err
 	}
 	rr, err := dns.NewRR(buffer.String())
 	if err != nil {
-		TemplateRRFailureCount.WithLabelValues(data.Zone, data.Class, data.Type, section, template.Tree.Root.String()).Inc()
+		templateRRFailureCount.WithLabelValues(server, data.Zone, data.Class, data.Type, section, template.Tree.Root.String()).Inc()
 		return rr, err
 	}
 	return rr, nil

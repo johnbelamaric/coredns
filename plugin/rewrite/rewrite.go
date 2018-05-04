@@ -64,7 +64,10 @@ func (rw Rewrite) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 			// }
 		}
 	}
-	return plugin.NextOrFailure(rw.Name(), rw.Next, ctx, w, r)
+	if rw.noRevert || len(wr.ResponseRules) == 0 {
+		return plugin.NextOrFailure(rw.Name(), rw.Next, ctx, w, r)
+	}
+	return plugin.NextOrFailure(rw.Name(), rw.Next, ctx, wr, r)
 }
 
 // Name implements the Handler interface.
@@ -91,7 +94,7 @@ func newRule(args ...string) (Rule, error) {
 	mode := Stop
 	switch arg0 {
 	case Continue:
-		mode = arg0
+		mode = Continue
 		ruleType = strings.ToLower(args[1])
 		expectNumArgs = len(args) - 1
 		startArg = 2
@@ -106,9 +109,14 @@ func newRule(args ...string) (Rule, error) {
 		startArg = 1
 	}
 
+	if ruleType == "answer" {
+		return nil, fmt.Errorf("response rewrites must begin with a name rule")
+	}
+
 	if ruleType != "edns0" && ruleType != "name" && expectNumArgs != 3 {
 		return nil, fmt.Errorf("%s rules must have exactly two arguments", ruleType)
 	}
+
 	switch ruleType {
 	case "name":
 		return newNameRule(mode, args[startArg:]...)

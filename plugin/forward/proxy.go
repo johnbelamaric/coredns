@@ -24,9 +24,6 @@ type Proxy struct {
 	fails uint32
 
 	avgRtt int64
-
-	state      uint32
-	inProgress int32
 }
 
 // NewProxy returns a new proxy.
@@ -41,6 +38,9 @@ func NewProxy(addr string, tlsConfig *tls.Config) *Proxy {
 	p.client = dnsClient(tlsConfig)
 	return p
 }
+
+// Addr returns the address to forward to.
+func (p *Proxy) Addr() (addr string) { return p.addr }
 
 // dnsClient returns a client used for health checking.
 func dnsClient(tlsConfig *tls.Config) *dns.Client {
@@ -57,8 +57,11 @@ func dnsClient(tlsConfig *tls.Config) *dns.Client {
 	return c
 }
 
-// SetTLSConfig sets the TLS config in the lower p.transport.
-func (p *Proxy) SetTLSConfig(cfg *tls.Config) { p.transport.SetTLSConfig(cfg) }
+// SetTLSConfig sets the TLS config in the lower p.transport and in the healthchecking client.
+func (p *Proxy) SetTLSConfig(cfg *tls.Config) {
+	p.transport.SetTLSConfig(cfg)
+	p.client = dnsClient(cfg)
+}
 
 // SetExpire sets the expire duration in the lower p.transport.
 func (p *Proxy) SetExpire(expire time.Duration) { p.transport.SetExpire(expire) }
@@ -82,25 +85,14 @@ func (p *Proxy) Down(maxfails uint32) bool {
 	return fails > maxfails
 }
 
-// close stops the health checking goroutine and connection manager.
+// close stops the health checking goroutine.
 func (p *Proxy) close() {
-	if atomic.CompareAndSwapUint32(&p.state, running, stopping) {
-		p.probe.Stop()
-	}
-	if atomic.LoadInt32(&p.inProgress) == 0 {
-		p.checkStopTransport()
-	}
+	p.probe.Stop()
+	p.transport.Stop()
 }
 
 // start starts the proxy's healthchecking.
 func (p *Proxy) start(duration time.Duration) { p.probe.Start(duration) }
-
-// checkStopTransport checks if stop was requested and stops connection manager
-func (p *Proxy) checkStopTransport() {
-	if atomic.CompareAndSwapUint32(&p.state, stopping, stopped) {
-		p.transport.Stop()
-	}
-}
 
 const (
 	dialTimeout = 4 * time.Second
@@ -108,10 +100,4 @@ const (
 	maxTimeout  = 2 * time.Second
 	minTimeout  = 10 * time.Millisecond
 	hcDuration  = 500 * time.Millisecond
-)
-
-const (
-	running = iota
-	stopping
-	stopped
 )

@@ -12,13 +12,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mholt/caddy"
-
 	"github.com/coredns/coredns/core/dnsserver"
+	clog "github.com/coredns/coredns/plugin/pkg/log"
+
+	"github.com/mholt/caddy"
 )
 
 func init() {
-	caddy.TrapSignals()
 	caddy.DefaultConfigFile = "Corefile"
 	caddy.Quiet = true // don't show init stuff from caddy
 	setVersion()
@@ -40,6 +40,8 @@ func init() {
 
 // Run is CoreDNS's main() function.
 func Run() {
+	caddy.TrapSignals()
+
 	// Reset flag.CommandLine to get rid of unwanted flags for instance from glog (used in kubernetes).
 	// And readd the once we want to keep.
 	flag.VisitAll(func(f *flag.Flag) {
@@ -156,8 +158,8 @@ func defaultLoader(serverType string) (caddy.Input, error) {
 
 // logVersion logs the version that is starting.
 func logVersion() {
-	log.Print("[INFO] " + versionString())
-	log.Print("[INFO] " + releaseString())
+	clog.Info(versionString())
+	clog.Info(releaseString())
 }
 
 // showVersion prints the version that is starting.
