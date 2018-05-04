@@ -13,7 +13,9 @@ type Watchable interface {
 	// SetWatchChan is called when the watch channel is created.
 	SetWatchChan(Chan)
 
-	// Watch is called whenever a watch is created for a FQDN.
+	// Watch is called whenever a watch is created for a FQDN. Plugins
+	// should send the FQDN down the watch channel when its data may have
+	// changed. This is an exact match only.
 	Watch(qname string) error
 
 	// StopWatching is called whenever all watches are canceled for a FQDN.

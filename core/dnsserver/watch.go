@@ -17,6 +17,7 @@ import (
 // watcher contains all the data needed to manage watches
 type watcher struct {
 	changes watch.Chan
+	stopper chan bool
 	counter int64
 	watches map[string]watchlist
 	plugins []watch.Watchable
@@ -26,7 +27,7 @@ type watcher struct {
 type watchlist map[int64]pb.DnsService_WatchServer
 
 func newWatcher(zones map[string]*Config) *watcher {
-	w := &watcher{changes: make(watch.Chan), watches: make(map[string]watchlist)}
+	w := &watcher{changes: make(watch.Chan), stopper: make(chan bool), watches: make(map[string]watchlist)}
 
 	for _, config := range zones {
 		plugins := config.Handlers()
@@ -134,6 +135,8 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 func (w *watcher) process() {
 	for {
 		select {
+		case <-w.stopper:
+			return
 		case changed := <-w.changes:
 			w.mutex.Lock()
 			for qname, wl := range w.watches {
@@ -154,6 +157,7 @@ func (w *watcher) process() {
 }
 
 func (w *watcher) stop() {
+	w.stopper <- true
 	w.mutex.Lock()
 	for wn, wl := range w.watches {
 		for id, stream := range wl {
