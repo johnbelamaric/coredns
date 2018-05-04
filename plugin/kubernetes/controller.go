@@ -528,7 +528,7 @@ func (dns *dnsControl) updateModifed() {
 
 func (dns *dnsControl) sendServiceUpdates(s *api.Service) {
 	for i := range dns.zones {
-		name := ServiceFQDN(s, dns.zones[i])
+		name := serviceFQDN(s, dns.zones[i])
 		if _, ok := dns.watched[name]; ok {
 			dns.watchChan <- name
 		}
@@ -537,7 +537,7 @@ func (dns *dnsControl) sendServiceUpdates(s *api.Service) {
 
 func (dns *dnsControl) sendPodUpdates(p *api.Pod) {
 	for i := range dns.zones {
-		name := PodFQDN(p, dns.zones[i])
+		name := podFQDN(p, dns.zones[i])
 		if _, ok := dns.watched[name]; ok {
 			dns.watchChan <- name
 		}
@@ -546,7 +546,7 @@ func (dns *dnsControl) sendPodUpdates(p *api.Pod) {
 
 func (dns *dnsControl) sendEndpointsUpdates(ep *api.Endpoints) {
 	for _, zone := range dns.zones {
-		names := append(EndpointFQDN(ep, zone, dns.endpointNameMode), ServiceFQDN(ep, zone))
+		names := append(endpointFQDN(ep, zone, dns.endpointNameMode), serviceFQDN(ep, zone))
 		for _, name := range names {
 			if _, ok := dns.watched[name]; ok {
 				dns.watchChan <- name

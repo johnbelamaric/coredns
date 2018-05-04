@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/pkg/watch"
 	"github.com/coredns/coredns/request"
 
 	"github.com/miekg/dns"
@@ -64,6 +65,9 @@ func (APIConnServiceTest) PodIndex(string) []*api.Pod             { return nil }
 func (APIConnServiceTest) SvcIndexReverse(string) []*api.Service  { return nil }
 func (APIConnServiceTest) EpIndexReverse(string) []*api.Endpoints { return nil }
 func (APIConnServiceTest) Modified() int64                        { return 0 }
+func (APIConnServiceTest) SetWatchChan(watch.Chan)                {}
+func (APIConnServiceTest) Watch(string) error                     { return nil }
+func (APIConnServiceTest) StopWatching(string)                    {}
 
 func (APIConnServiceTest) SvcIndex(string) []*api.Service {
 	svcs := []*api.Service{
@@ -392,7 +396,7 @@ func TestServices(t *testing.T) {
 }
 
 func TestServiceFQDN(t *testing.T) {
-	fqdn := ServiceFQDN(
+	fqdn := serviceFQDN(
 		&api.Service{
 			ObjectMeta: meta.ObjectMeta{
 				Name:      "svc1",
@@ -407,7 +411,7 @@ func TestServiceFQDN(t *testing.T) {
 }
 
 func TestPodFQDN(t *testing.T) {
-	fqdn := PodFQDN(
+	fqdn := podFQDN(
 		&api.Pod{
 			ObjectMeta: meta.ObjectMeta{
 				Name:      "pod1",
@@ -422,7 +426,7 @@ func TestPodFQDN(t *testing.T) {
 	if fqdn != expected {
 		t.Errorf("Expected '%v', got '%v'.", expected, fqdn)
 	}
-	fqdn = PodFQDN(
+	fqdn = podFQDN(
 		&api.Pod{
 			ObjectMeta: meta.ObjectMeta{
 				Name:      "pod1",
@@ -440,7 +444,7 @@ func TestPodFQDN(t *testing.T) {
 }
 
 func TestEndpointFQDN(t *testing.T) {
-	fqdns := EndpointFQDN(
+	fqdns := endpointFQDN(
 		&api.Endpoints{
 			Subsets: []api.EndpointSubset{
 				{

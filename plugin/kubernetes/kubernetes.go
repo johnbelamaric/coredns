@@ -296,24 +296,24 @@ func (k *Kubernetes) Records(state request.Request, exact bool) ([]msg.Service, 
 	return services, err
 }
 
-// ServiceFQDN returns the k8s cluster dns spec service FQDN for the service (or endpoint) object
-func ServiceFQDN(obj meta.Object, zone string) string {
+// serviceFQDN returns the k8s cluster dns spec service FQDN for the service (or endpoint) object.
+func serviceFQDN(obj meta.Object, zone string) string {
 	return dnsutil.Join(append([]string{}, obj.GetName(), obj.GetNamespace(), Svc, zone))
 }
 
-// PodFQDN returns the k8s cluster dns spec FQDN for the pod
-func PodFQDN(p *api.Pod, zone string) string {
+// podFQDN returns the k8s cluster dns spec FQDN for the pod
+func podFQDN(p *api.Pod, zone string) string {
 	name := strings.Replace(p.Status.PodIP, ".", "-", -1)
 	name = strings.Replace(name, ":", "-", -1)
 	return dnsutil.Join(append([]string{}, name, p.GetNamespace(), Pod, zone))
 }
 
-// EndpointFQDN returns a list of k8s cluster dns spec service FQDNs for each subset in the endpoint
-func EndpointFQDN(ep *api.Endpoints, zone string, endpointNameMode bool) []string {
+// endpointFQDN returns a list of k8s cluster dns spec service FQDNs for each subset in the endpoint
+func endpointFQDN(ep *api.Endpoints, zone string, endpointNameMode bool) []string {
 	var names []string
 	for _, ss := range ep.Subsets {
 		for _, addr := range ss.Addresses {
-			names = append(names, dnsutil.Join(append([]string{}, endpointHostname(addr, endpointNameMode), ServiceFQDN(ep, zone))))
+			names = append(names, dnsutil.Join(append([]string{}, endpointHostname(addr, endpointNameMode), serviceFQDN(ep, zone))))
 		}
 	}
 	return names
