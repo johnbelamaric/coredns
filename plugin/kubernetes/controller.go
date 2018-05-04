@@ -47,6 +47,11 @@ type dnsController interface {
 
 	// Modified returns the timestamp of the most recent changes
 	Modified() int64
+
+	// Watch-related items
+	SetWatchChan(dnswatch.Chan)
+	Watch(string) error
+	StopWatching(string)
 }
 
 type dnsControl struct {
@@ -77,7 +82,7 @@ type dnsControl struct {
 	stopCh   chan struct{}
 
 	// watch-related items channel
-	watchChan        *dnswatch.Chan
+	watchChan        dnswatch.Chan
 	watched          map[string]bool
 	zones            []string
 	endpointNameMode bool
@@ -90,9 +95,7 @@ type dnsControlOpts struct {
 	// Label handling.
 	labelSelector *meta.LabelSelector
 	selector      labels.Selector
-	// watch-related items channel
-	watchChan        *dnswatch.Chan
-	watched          map[string]bool
+
 	zones            []string
 	endpointNameMode bool
 }
@@ -103,8 +106,7 @@ func newdnsController(kubeClient *kubernetes.Clientset, opts dnsControlOpts) *dn
 		client:           kubeClient,
 		selector:         opts.selector,
 		stopCh:           make(chan struct{}),
-		watchChan:        opts.watchChan,
-		watched:          opts.watched,
+		watched:          make(map[string]bool),
 		zones:            opts.zones,
 		endpointNameMode: opts.endpointNameMode,
 	}
@@ -308,6 +310,22 @@ func namespaceWatchFunc(c *kubernetes.Clientset, s labels.Selector) func(options
 	}
 }
 
+func (dns *dnsControl) SetWatchChan(c dnswatch.Chan) {
+	dns.watchChan = c
+}
+
+func (dns *dnsControl) Watch(qname string) error {
+	if dns.watchChan == nil {
+		return fmt.Errorf("cannot start watch because the channel has not been set")
+	}
+	dns.watched[qname] = true
+	return nil
+}
+
+func (dns *dnsControl) StopWatching(qname string) {
+	delete(dns.watched, qname)
+}
+
 // Stop stops the  controller.
 func (dns *dnsControl) Stop() error {
 	dns.stopLock.Lock()
@@ -509,43 +527,31 @@ func (dns *dnsControl) updateModifed() {
 }
 
 func (dns *dnsControl) sendServiceUpdates(s *api.Service) {
-	var z []string
 	for i := range dns.zones {
 		name := ServiceFQDN(s, dns.zones[i])
 		if _, ok := dns.watched[name]; ok {
-			z = append(z, name)
+			dns.watchChan <- name
 		}
-	}
-	if len(z) > 0 {
-		*dns.watchChan <- z
 	}
 }
 
 func (dns *dnsControl) sendPodUpdates(p *api.Pod) {
-	var z []string
 	for i := range dns.zones {
 		name := PodFQDN(p, dns.zones[i])
 		if _, ok := dns.watched[name]; ok {
-			z = append(z, name)
+			dns.watchChan <- name
 		}
-	}
-	if len(z) > 0 {
-		*dns.watchChan <- z
 	}
 }
 
 func (dns *dnsControl) sendEndpointsUpdates(ep *api.Endpoints) {
-	var z []string
 	for _, zone := range dns.zones {
 		names := append(EndpointFQDN(ep, zone, dns.endpointNameMode), ServiceFQDN(ep, zone))
 		for _, name := range names {
 			if _, ok := dns.watched[name]; ok {
-				z = append(z, name)
+				dns.watchChan <- name
 			}
 		}
-	}
-	if len(z) > 0 {
-		*dns.watchChan <- z
 	}
 }
 

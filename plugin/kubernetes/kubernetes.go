@@ -15,7 +15,6 @@ import (
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	"github.com/coredns/coredns/plugin/pkg/healthcheck"
 	"github.com/coredns/coredns/plugin/pkg/upstream"
-	"github.com/coredns/coredns/plugin/pkg/watch"
 	"github.com/coredns/coredns/request"
 
 	"github.com/miekg/dns"
@@ -50,8 +49,6 @@ type Kubernetes struct {
 	interfaceAddrsFunc func() net.IP
 	autoPathSearch     []string // Local search path from /etc/resolv.conf. Needed for autopath.
 	TransferTo         []string
-	watchChan          watch.Chan
-	watched            map[string]bool // Names being watched
 }
 
 // New returns a initialized Kubernetes. It default interfaceAddrFunc to return 127.0.0.1. All other
@@ -63,7 +60,6 @@ func New(zones []string) *Kubernetes {
 	k.interfaceAddrsFunc = func() net.IP { return net.ParseIP("127.0.0.1") }
 	k.podMode = podModeDisabled
 	k.ttl = defaultTTL
-	k.watched = make(map[string]bool)
 
 	return k
 }
@@ -266,8 +262,6 @@ func (k *Kubernetes) InitKubeCache() (err error) {
 
 	k.opts.initPodCache = k.podMode == podModeVerified
 
-	k.opts.watchChan = &(k.watchChan)
-	k.opts.watched = k.watched
 	k.opts.zones = k.Zones
 	k.opts.endpointNameMode = k.endpointNameMode
 	k.APIConn = newdnsController(kubeClient, k.opts)

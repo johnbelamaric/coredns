@@ -3,14 +3,15 @@ package dnsserver
 import (
 	"fmt"
 	"io"
-	"log"
 	"sync"
 
 	"github.com/miekg/dns"
 
 	"github.com/coredns/coredns/pb"
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/plugin/pkg/watch"
+	"github.com/coredns/coredns/request"
 )
 
 // watcher contains all the data needed to manage watches
@@ -37,7 +38,7 @@ func newWatcher(zones map[string]*Config) *watcher {
 		}
 	}
 
-	go w.processWatches()
+	go w.process()
 	return w
 }
 
@@ -66,7 +67,7 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 			msg := new(dns.Msg)
 			err := msg.Unpack(create.Query.Msg)
 			if err != nil {
-				log.Printf("[WARNING] Could not decode watch request: %s\n", err)
+				log.Warningf("Could not decode watch request: %s\n", err)
 				stream.Send(&pb.WatchResponse{Err: "could not decode request"})
 				continue
 			}
@@ -76,7 +77,9 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 				continue
 			}
 
-			qname := msg.Question[0].Name
+			// Normalize qname
+			qname := (&request.Request{Req: msg}).Name()
+
 			w.mutex.Lock()
 			if _, ok := w.watches[qname]; !ok {
 				w.watches[qname] = make(watchlist)
@@ -87,7 +90,7 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 			for _, p := range w.plugins {
 				err := p.Watch(qname)
 				if err != nil {
-					log.Printf("[WARNING] Failed to start watch for %s in plugin %s: %s\n", qname, p.Name(), err)
+					log.Warningf("Failed to start watch for %s in plugin %s: %s\n", qname, p.Name(), err)
 					stream.Send(&pb.WatchResponse{Err: fmt.Sprintf("failed to start watch for %s in plugin %s", qname, p.Name())})
 				}
 			}
@@ -128,20 +131,20 @@ func (w *watcher) watch(stream pb.DnsService_WatchServer) error {
 	}
 }
 
-func (w *watcher) processWatches() {
+func (w *watcher) process() {
 	for {
 		select {
 		case changed := <-w.changes:
 			w.mutex.Lock()
 			for qname, wl := range w.watches {
-				if plugin.Zones(changed).Matches(qname) == "" {
+				if plugin.Zones([]string{changed}).Matches(qname) == "" {
 					continue
 				}
 				for id, stream := range wl {
 					wr := pb.WatchResponse{WatchId: id, Qname: qname}
 					err := stream.Send(&wr)
 					if err != nil {
-						log.Printf("[WARNING] Error sending change for %s to watch %d: %s\n", qname, id, err)
+						log.Warningf("Error sending change for %s to watch %d: %s\n", qname, id, err)
 					}
 				}
 			}
@@ -157,7 +160,7 @@ func (w *watcher) stop() {
 			wr := pb.WatchResponse{WatchId: id, Canceled: true}
 			err := stream.Send(&wr)
 			if err != nil {
-				log.Printf("[WARNING] Error notifiying client of cancellation: %s\n", err)
+				log.Warningf("Error notifiying client of cancellation: %s\n", err)
 			}
 		}
 		delete(w.watches, wn)
