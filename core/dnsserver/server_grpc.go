@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/peer"
 
 	"github.com/coredns/coredns/pb"
+	"github.com/coredns/coredns/plugin/pkg/watch"
 )
 
 // ServergRPC represents an instance of a DNS-over-gRPC server.
@@ -22,7 +23,7 @@ type ServergRPC struct {
 	grpcServer *grpc.Server
 	listenAddr net.Addr
 	tlsConfig  *tls.Config
-	watch      *watcher
+	watch      watch.Watcher
 }
 
 // NewServergRPC returns a new CoreDNS GRPC server and compiles all plugin in to it.
@@ -39,7 +40,7 @@ func NewServergRPC(addr string, group []*Config) (*ServergRPC, error) {
 		tlsConfig = conf.TLSConfig
 	}
 
-	return &ServergRPC{Server: s, tlsConfig: tlsConfig, watch: newWatcher(s.zones)}, nil
+	return &ServergRPC{Server: s, tlsConfig: tlsConfig, watch: watch.NewWatcher(watchables(s.zones))}, nil
 }
 
 // Serve implements caddy.TCPServer interface.
@@ -102,7 +103,7 @@ func (s *ServergRPC) Stop() (err error) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if s.watch != nil {
-		s.watch.stop()
+		s.watch.Stop()
 	}
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
@@ -145,7 +146,7 @@ func (s *ServergRPC) Query(ctx context.Context, in *pb.DnsPacket) (*pb.DnsPacket
 // Watch is the entrypoint called by the gRPC layer when the user asks
 // to watch a query.
 func (s *ServergRPC) Watch(stream pb.DnsService_WatchServer) error {
-	return s.watch.watch(stream)
+	return s.watch.Watch(stream)
 }
 
 // Shutdown stops the server (non gracefully).
