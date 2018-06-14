@@ -22,8 +22,8 @@ type Watcher interface {
 	Stop()
 }
 
-// watcher contains all the data needed to manage watches
-type watcher struct {
+// WatchManager contains all the data needed to manage watches
+type WatchManager struct {
 	changes Chan
 	stopper chan bool
 	counter int64
@@ -35,8 +35,8 @@ type watcher struct {
 type watchlist map[int64]pb.DnsService_WatchServer
 
 // NewWatcher creates a Watcher, which is used to manage watched names.
-func NewWatcher(plugins []Watchable) *watcher {
-	w := &watcher{changes: make(Chan), stopper: make(chan bool), watches: make(map[string]watchlist), plugins: plugins}
+func NewWatcher(plugins []Watchable) *WatchManager {
+	w := &WatchManager{changes: make(Chan), stopper: make(chan bool), watches: make(map[string]watchlist), plugins: plugins}
 
 	for _, p := range plugins {
 		p.SetWatchChan(w.changes)
@@ -46,7 +46,7 @@ func NewWatcher(plugins []Watchable) *watcher {
 	return w
 }
 
-func (w *watcher) nextID() int64 {
+func (w *WatchManager) nextID() int64 {
 	w.mutex.Lock()
 
 	w.counter++
@@ -57,7 +57,7 @@ func (w *watcher) nextID() int64 {
 }
 
 // Watch monitors a client stream and creates and cancels watches.
-func (w *watcher) Watch(stream pb.DnsService_WatchServer) error {
+func (w *WatchManager) Watch(stream pb.DnsService_WatchServer) error {
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
@@ -135,7 +135,7 @@ func (w *watcher) Watch(stream pb.DnsService_WatchServer) error {
 	}
 }
 
-func (w *watcher) process() {
+func (w *WatchManager) process() {
 	for {
 		select {
 		case <-w.stopper:
@@ -161,7 +161,7 @@ func (w *watcher) process() {
 }
 
 // Stop cancels open watches and stops the watch processing go routine.
-func (w *watcher) Stop() {
+func (w *WatchManager) Stop() {
 	w.stopper <- true
 	w.mutex.Lock()
 	for wn, wl := range w.watches {
