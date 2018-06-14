@@ -150,7 +150,8 @@ func (w *watcher) process() {
 					wr := pb.WatchResponse{WatchId: id, Qname: qname}
 					err := stream.Send(&wr)
 					if err != nil {
-						log.Warningf("Error sending change for %s to watch %d: %s\n", qname, id, err)
+						log.Warningf("Error sending change for %s to watch %d: %s. Removing watch.\n", qname, id, err)
+						delete(w.watches[qname], id)
 					}
 				}
 			}
