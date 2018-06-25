@@ -34,7 +34,7 @@ func NewProxy(addr string, tlsConfig *tls.Config) *Proxy {
 		fails:     0,
 		probe:     up.New(),
 		transport: newTransport(addr, tlsConfig),
-		avgRtt:    int64(timeout / 2),
+		avgRtt:    int64(maxTimeout / 2),
 	}
 	p.client = dnsClient(tlsConfig)
 	runtime.SetFinalizer(p, (*Proxy).finalizer)
@@ -106,9 +106,7 @@ func (p *Proxy) start(duration time.Duration) {
 }
 
 const (
-	dialTimeout = 4 * time.Second
-	timeout     = 2 * time.Second
-	maxTimeout  = 2 * time.Second
-	minTimeout  = 10 * time.Millisecond
-	hcDuration  = 500 * time.Millisecond
+	maxTimeout = 2 * time.Second
+	minTimeout = 200 * time.Millisecond
+	hcInterval = 500 * time.Millisecond
 )

@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/coredns/coredns/pb"
+	"github.com/coredns/coredns/plugin/pkg/watch"
+
 	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 	"github.com/miekg/dns"
 	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
-
-	"github.com/coredns/coredns/pb"
-	"github.com/coredns/coredns/plugin/pkg/watch"
 )
 
 // ServergRPC represents an instance of a DNS-over-gRPC server.
