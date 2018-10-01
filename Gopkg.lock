@@ -10,21 +10,6 @@
   version = "v0.28.0"
 
 [[projects]]
-  digest = "1:b1021ab915da0b8ddaa1dd17873fd9c08871f2c6f1b7fccb708db97ca81c6c42"
-  name = "github.com/Azure/go-autorest"
-  packages = [
-    "autorest",
-    "autorest/adal",
-    "autorest/azure",
-    "autorest/date",
-    "logger",
-    "version",
-  ]
-  pruneopts = ""
-  revision = "87f168d7649781e529653290e223c9c84b789c00"
-  version = "v11.0.0"
-
-[[projects]]
   digest = "1:6aa683f91e93784ec7b76fe1568492f419aa3aa0b72f2087912c8c2cada7a375"
   name = "github.com/DataDog/dd-trace-go"
   packages = [
@@ -111,14 +96,6 @@
   pruneopts = ""
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
-
-[[projects]]
-  digest = "1:6098222470fe0172157ce9bbef5d2200df4edde17ee649c5d6e48330e4afa4c6"
-  name = "github.com/dgrijalva/jwt-go"
-  packages = ["."]
-  pruneopts = ""
-  revision = "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e"
-  version = "v3.2.0"
 
 [[projects]]
   branch = "master"
@@ -777,8 +754,6 @@
     "pkg/apis/clientauthentication/v1alpha1",
     "pkg/apis/clientauthentication/v1beta1",
     "pkg/version",
-    "plugin/pkg/client/auth",
-    "plugin/pkg/client/auth/azure",
     "plugin/pkg/client/auth/exec",
     "plugin/pkg/client/auth/gcp",
     "plugin/pkg/client/auth/oidc",
@@ -851,7 +826,9 @@
     "k8s.io/apimachinery/pkg/watch",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/fake",
-    "k8s.io/client-go/plugin/pkg/client/auth",
+    "k8s.io/client-go/plugin/pkg/client/auth/gcp",
+    "k8s.io/client-go/plugin/pkg/client/auth/oidc",
+    "k8s.io/client-go/plugin/pkg/client/auth/openstack",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
