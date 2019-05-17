@@ -7,6 +7,7 @@ import (
 	"github.com/coredns/coredns/request"
 )
 
+// Metadata implements the metadata.Provider interface
 func (k *Kubernetes) Metadata(ctx context.Context, state request.Request) context.Context {
 	// TODO: we should probably cache r so it doesn't need to be calculated again in ServeDNS
 	r, err := parseRequest(state)
