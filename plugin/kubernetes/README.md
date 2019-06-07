@@ -228,7 +228,7 @@ or the word "any"), then that label will match all values.  The labels that acce
 
 ## Metadata
 
-The kubernetes plugin will publish the following metadata, if the metadata
+The kubernetes plugin will publish the following metadata, if the _metadata_
 plugin is also enabled:
 
  * kubernetes/endpoint: the endpoint name in the query
