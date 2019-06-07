@@ -61,6 +61,30 @@ var metadataCases = []struct {
 			"kubernetes/service":   "s",
 		},
 	},
+	{
+		Qname: "_http._tcp.s.ns.svc.cluster.local.", Qtype: dns.TypeSRV,
+		RemoteIP: "10.10.10.10",
+		Md: map[string]string{
+			"kubernetes/endpoint":  "",
+			"kubernetes/kind":      "svc",
+			"kubernetes/namespace": "ns",
+			"kubernetes/port-name": "http",
+			"kubernetes/protocol":  "tcp",
+			"kubernetes/service":   "s",
+		},
+	},
+	{
+		Qname: "ep.s.ns.svc.cluster.local.", Qtype: dns.TypeA,
+		RemoteIP: "10.10.10.10",
+		Md: map[string]string{
+			"kubernetes/endpoint":  "ep",
+			"kubernetes/kind":      "svc",
+			"kubernetes/namespace": "ns",
+			"kubernetes/port-name": "*",
+			"kubernetes/protocol":  "*",
+			"kubernetes/service":   "s",
+		},
+	},
 }
 
 func mapsDiffer(a, b map[string]string) bool {

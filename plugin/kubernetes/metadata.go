@@ -9,7 +9,7 @@ import (
 
 // Metadata implements the metadata.Provider interface
 func (k *Kubernetes) Metadata(ctx context.Context, state request.Request) context.Context {
-	// TODO: we should probably cache r so it doesn't need to be calculated again in ServeDNS
+	// possible optimization: cache r so it doesn't need to be calculated again in ServeDNS
 	r, err := parseRequest(state)
 	if err != nil {
 		metadata.SetValueFunc(ctx, "kubernetes/parse-error", func() string {
